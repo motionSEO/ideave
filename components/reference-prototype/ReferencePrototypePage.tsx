@@ -24,7 +24,7 @@ import {
   seedProjectExploreTexts,
   type ExploreTextEntry,
 } from "@/components/reference-prototype/exploreGrid";
-import { IdeaveLogo, ProfileIconButton, ProjectRegisterTrigger } from "@/components/reference-prototype/IdeaveLogo";
+import { IdeaveLogo, ProfileIconButton } from "@/components/reference-prototype/IdeaveLogo";
 import { BoardCanvasCard, type BoardCanvasItem } from "@/components/reference-prototype/BoardCanvasCard";
 import {
   BOARD_TEXT_FONT_SIZE,
@@ -116,6 +116,9 @@ const BOARD_PANEL_DEFAULT_PX = 560;
 const BOARD_PANEL_MIN_PX = 400;
 const BOARD_PANEL_INNER_GUTTER_PX = 80;
 const BOARD_PANEL_WIDTH_STORAGE_KEY = "ideave.boardPanelWidth";
+// 화면 오른쪽 인덱스 탭(프로젝트·캔버스) 너비. 캔버스가 닫혀 있을 땐 탐색 그리드 오른쪽 여백에 이만큼 더 비우고,
+// 열려 있을 땐 캔버스 패널 왼쪽 안쪽 여백(BOARD_PANEL_INNER_GUTTER_PX의 절반 40px)에 탭을 넣어 그리드 칸 수를 지킨다.
+const INDEX_TAB_PX = 36;
 // 탐색 그리드: 카드 240px, 간격 40px, 섹션 좌우 패딩(px-8) 64px. 캔버스를 넓혀도 최소 2칸은 남긴다.
 const EXPLORE_CARD_PX = 240;
 const EXPLORE_GAP_PX = 40;
@@ -1290,6 +1293,36 @@ function buildBoardKeywordPayloadItem(
     signals,
     ...(imageUrl ? { imageUrl } : {}),
   };
+}
+
+/** 오른쪽 인덱스 탭. 두 탭은 크기·모양이 같고 색만 반전(dark = 다크 바탕+흰 글자, lime = 라임 바탕+다크 글자). */
+function IndexTab({
+  label,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  tone: "dark" | "lime";
+  active: boolean;
+  onClick: () => void;
+}) {
+  const toneClass = tone === "dark" ? "bg-[#222222] text-white" : "bg-[#F5F53D] text-[#222222]";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={label}
+      className={`flex h-[150px] items-center justify-center overflow-hidden rounded-l-[4px] transition-[width] duration-150 ${toneClass} ${
+        active ? "w-10" : "w-[var(--index-tab-w)] hover:w-10"
+      }`}
+    >
+      <span className="max-h-[126px] overflow-hidden text-ellipsis whitespace-nowrap font-[family-name:var(--font-pretendard)] text-[13px] font-semibold tracking-[0.08em] [writing-mode:vertical-rl]">
+        {label}
+      </span>
+    </button>
+  );
 }
 
 function formatBoardKeywordBubbleLabel(words: string[]): string {
@@ -4463,6 +4496,7 @@ export function ReferencePrototypePage() {
         {
           "--board-w": `${boardPanelWidth}px`,
           "--board-inner-w": `${boardPanelWidth - BOARD_PANEL_INNER_GUTTER_PX}px`,
+          "--index-tab-w": `${INDEX_TAB_PX}px`,
         } as CSSProperties
       }
     >
@@ -4568,16 +4602,26 @@ export function ReferencePrototypePage() {
         </div>
       ) : null}
 
+      {/* 화면 오른쪽 인덱스 탭: 프로젝트(다크) / 캔버스(라임). 캔버스를 펼치면 패널 왼쪽 안쪽 여백으로 따라 들어간다. */}
+      <nav
+        aria-label="프로젝트와 캔버스"
+        className={`fixed top-[calc(8.25rem+24px)] z-[46] flex flex-col items-end gap-2 ${
+          boardOpen ? "right-0 lg:right-[calc(var(--board-w)-var(--index-tab-w))]" : "right-0"
+        }`}
+      >
+        <IndexTab
+          label={project ? project.name : "프로젝트 등록"}
+          tone="dark"
+          active={projectModalOpen}
+          onClick={() => setProjectModalOpen(true)}
+        />
+        <IndexTab label="캔버스" tone="lime" active={boardOpen} onClick={() => setBoardOpen((prev) => !prev)} />
+      </nav>
+
       <div ref={stickyChromeRef} className="sticky top-0 z-50 w-full">
         <header className="bg-[#222222]">
           <div className="flex w-full items-center justify-between px-10 py-3">
             <IdeaveLogo theme="dark" onHomeClick={goToExploreHome} />
-            <ProjectRegisterTrigger
-              onClick={() => setProjectModalOpen(true)}
-              hasProject={Boolean(project)}
-              projectName={project?.name}
-              projectGoal={project?.goal}
-            />
             <div className="flex shrink-0 items-center gap-3">
               <button
                 type="button"
@@ -4633,13 +4677,6 @@ export function ReferencePrototypePage() {
                   </label>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setBoardOpen((prev) => !prev)}
-                className="h-8 shrink-0 rounded-[5px] border-0 bg-[#F5F53D] px-3 text-[14px] font-medium leading-none text-[#222222] transition-colors hover:bg-[color-mix(in_srgb,#FFFFFF_20%,#F5F53D)] disabled:bg-[#848484] disabled:text-white/80"
-              >
-                캔버스
-              </button>
             </div>
           </div>
 
@@ -4768,7 +4805,7 @@ export function ReferencePrototypePage() {
         className={`grid min-h-[calc(100vh-9rem)] ${boardOpen ? "lg:min-h-[calc(100vh-7rem)] lg:grid-cols-[1fr_var(--board-w)]" : "grid-cols-1"}`}
       >
         <section
-          className="min-w-0 px-8 pb-6"
+          className={`min-w-0 pb-6 pl-8 ${boardOpen ? "pr-[calc(2rem+var(--index-tab-w))] lg:pr-8" : "pr-[calc(2rem+var(--index-tab-w))]"}`}
           style={{ paddingTop: isDetailExplore ? Math.max(24, detailChromePad + 12) : 24 }}
         >
           <div
