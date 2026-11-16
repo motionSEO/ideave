@@ -1,0 +1,10 @@
+# Uploaded to Vercel by `vercel deploy`. Keys and Drive login stay local
+# (they go to Vercel as environment variables instead).
+.env*
+credentials.json
+token.json
+*.pem
+node_modules
+.next
+dist
+.claude

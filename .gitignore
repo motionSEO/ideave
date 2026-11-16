@@ -41,8 +41,11 @@ yarn-error.log*
 next-env.d.ts
 credentials.json
 token.json
-# personal Google Drive reference data (kept local)
-/data/google-drive/*.json
+# Drive snapshot cache (kept local; AI tag data is shared)
+/data/google-drive/personal-db-snapshot.json
 
 # env template has no values, so it is safe to share
 !.env.example
+
+.vercel
+.env*
