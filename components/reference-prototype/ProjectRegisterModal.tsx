@@ -10,10 +10,16 @@ type ProjectRegisterModalProps = {
   onStart: (projectName: string, goal: string) => void;
   onUpdate?: (projectName: string, goal: string) => void;
   onReset?: () => void;
+  /** "panel": 화면 오른쪽에서 열리는 인덱스 패널(캔버스처럼). 기본은 가운데 모달. */
+  variant?: "modal" | "panel";
 };
 
 const MODAL_CLASS =
   "relative z-[1] flex h-[370px] w-[800px] max-w-[calc(100vw-2rem)] flex-col rounded-[5px] bg-white p-10 shadow-xl";
+
+// 오른쪽 인덱스 패널: 헤더 아래부터 화면 끝까지, 왼쪽에 프로젝트 탭과 같은 다크 테두리.
+const PANEL_CLASS =
+  "fixed bottom-0 right-0 top-[8.25rem] z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col border-l-4 border-solid border-[#222222] bg-white p-8 shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-200 ease-out starting:translate-x-full";
 
 const FIELD_LABEL_CLASS =
   "font-[family-name:var(--font-pretendard)] text-[14px] font-medium leading-normal text-[#222222]";
@@ -67,7 +73,9 @@ export function ProjectRegisterModal({
   onStart,
   onUpdate,
   onReset,
+  variant = "modal",
 }: ProjectRegisterModalProps) {
+  const isPanel = variant === "panel";
   const titleId = useId();
   const [projectName, setProjectName] = useState("");
   const [goal, setGoal] = useState("");
@@ -175,16 +183,16 @@ export function ProjectRegisterModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className={isPanel ? "contents" : "fixed inset-0 z-[100] flex items-center justify-center p-4"}
       role="presentation"
-      onClick={onClose}
+      onClick={isPanel ? undefined : onClose}
     >
-      <div className="absolute inset-0 bg-black/50" aria-hidden />
+      {isPanel ? null : <div className="absolute inset-0 bg-black/50" aria-hidden />}
       <div
         role="dialog"
-        aria-modal="true"
+        aria-modal={isPanel ? undefined : "true"}
         aria-labelledby={titleId}
-        className={MODAL_CLASS}
+        className={isPanel ? PANEL_CLASS : MODAL_CLASS}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex flex-col gap-1">
@@ -240,11 +248,12 @@ export function ProjectRegisterModal({
             </p>
           ) : null}
 
-          <div className="mt-auto flex justify-end gap-2 pt-4">
+          <div className={`flex justify-end gap-2 ${isPanel ? "mt-6 flex-wrap" : "mt-auto pt-4"}`}>
             <button type="button" onClick={requestResetConfirm} className={SECONDARY_BUTTON_CLASS}>
               초기화
             </button>
-            <button
+            {/* 좁은 오른쪽 패널에선 등록된 프로젝트가 있을 때만 수정 버튼을 둔다. */}
+            {isPanel && !hasExistingProject ? null : <button
               type="button"
               onClick={handleEnterEditMode}
               disabled={!editButtonActive}
@@ -253,7 +262,7 @@ export function ProjectRegisterModal({
             >
               프로젝트 수정
               <EditIcon />
-            </button>
+            </button>}
             <button type="submit" className={PRIMARY_BUTTON_CLASS}>
               프로젝트 시작
               <ArrowRightIcon />

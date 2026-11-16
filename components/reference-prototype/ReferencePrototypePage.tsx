@@ -4507,6 +4507,7 @@ export function ReferencePrototypePage() {
         onStart={handleProjectStart}
         onUpdate={handleProjectUpdate}
         onReset={handleProjectReset}
+        variant="panel"
       />
       <CreateModal
         open={createModalOpen}
@@ -4605,17 +4606,34 @@ export function ReferencePrototypePage() {
       {/* 화면 오른쪽 인덱스 탭: 프로젝트(다크) / 캔버스(라임). 캔버스를 펼치면 패널 왼쪽 안쪽 여백으로 따라 들어간다. */}
       <nav
         aria-label="프로젝트와 캔버스"
-        className={`fixed top-[calc(8.25rem+24px)] z-[46] flex flex-col items-end gap-2 ${
-          boardOpen ? "right-0 lg:right-[calc(var(--board-w)-var(--index-tab-w))]" : "right-0"
+        className={`fixed top-[calc(8.25rem+24px)] flex flex-col items-end gap-2 ${
+          projectModalOpen
+            ? "right-[min(400px,calc(100vw-3rem))] z-[48]"
+            : boardOpen
+              ? "right-0 z-[46] lg:right-[calc(var(--board-w)-var(--index-tab-w))]"
+              : "right-0 z-[46]"
         }`}
       >
         <IndexTab
           label={project ? project.name : "프로젝트 등록"}
           tone="dark"
           active={projectModalOpen}
-          onClick={() => setProjectModalOpen(true)}
+          onClick={() => setProjectModalOpen((prev) => !prev)}
         />
-        <IndexTab label="캔버스" tone="lime" active={boardOpen} onClick={() => setBoardOpen((prev) => !prev)} />
+        <IndexTab
+          label="캔버스"
+          tone="lime"
+          active={boardOpen && !projectModalOpen}
+          onClick={() => {
+            // 프로젝트 패널이 열려 있으면 닫고 캔버스를 보여 준다.
+            if (projectModalOpen) {
+              setProjectModalOpen(false);
+              setBoardOpen(true);
+              return;
+            }
+            setBoardOpen((prev) => !prev);
+          }}
+        />
       </nav>
 
       <div ref={stickyChromeRef} className="sticky top-0 z-50 w-full">
