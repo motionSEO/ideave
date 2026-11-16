@@ -1,0 +1,20 @@
+-- /api/backfill-embeddings 는 PATCH 로 embedding 을 업데이트합니다.
+-- Supabase에서는 service_role 키를 쓰면 RLS를 우회하므로 이 파일 없이 동작합니다. (권장)
+--
+-- service_role 없이 anon 키만 쓰는 경우에만 아래 정책을 검토하세요.
+-- anon 전체 UPDATE 는 운영에 위험하므로, 가능하면 서버에서만 SUPABASE_SERVICE_ROLE_KEY 를 사용하세요.
+--
+-- do $$
+-- begin
+--   if not exists (
+--     select 1 from pg_policies
+--     where schemaname = 'public' and tablename = 'images' and policyname = 'Allow anon update images embeddings'
+--   ) then
+--     create policy "Allow anon update images embeddings"
+--       on public.images
+--       for update
+--       to anon
+--       using (true)
+--       with check (true);
+--   end if;
+-- end $$;

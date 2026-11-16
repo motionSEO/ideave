@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IDEAVE</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <style>
+    @font-face {
+      font-family: Pretendard;
+      src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/Pretendard-Medium.woff2") format("woff2");
+      font-weight: 500;
+      font-display: swap;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #fff; color: #222; font-family: Pretendard, "Apple SD Gothic Neo", sans-serif; }
+    button, input { font-family: inherit; }
+    button { cursor: pointer; }
+    .sticky { position: sticky; top: 0; z-index: 50; }
+    header { background: #222; }
+    .header-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 40px; }
+    .logo { display: flex; align-items: center; gap: 8px; background: none; border: 0; color: #fff; padding: 0; }
+    .logo-mark { width: 18px; height: 18px; background: #F5F53D; }
+    .logo-type { font-size: 18px; font-weight: 500; letter-spacing: 0.04em; }
+    .project-btn {
+      flex: 1; max-width: 520px; margin: 0 24px; height: 36px; border: 0; border-radius: 5px;
+      background: #F0F0F0; color: #222; font-size: 14px; font-weight: 500;
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .ghost { background: none; border: 0; color: #F0F0F0; font-size: 14px; font-weight: 500; }
+    .avatar { width: 32px; height: 32px; border: 0; border-radius: 999px; background: #F0F0F0; }
+    .search-bar { background: #fff; padding: 16px 40px 12px; display: flex; align-items: center; gap: 24px; }
+    .search-box { flex: 1; display: flex; align-items: center; height: 32px; background: #F0F0F0; border-radius: 5px; padding: 0 4px 0 12px; }
+    .search-box input { flex: 1; border: 0; background: transparent; outline: none; font-size: 14px; font-weight: 500; }
+    .search-box input::placeholder { color: #848484; }
+    .icon-btn { width: 28px; height: 28px; border: 0; border-radius: 4px; background: transparent; color: #848484; }
+    .canvas-btn { height: 32px; border: 0; border-radius: 5px; background: #F5F53D; padding: 0 12px; font-size: 14px; font-weight: 500; }
+    .filters { display: flex; gap: 8px; padding: 12px 40px; border-top: 1px solid #E5E5E5; background: #fff; }
+    .chip { height: 32px; border: 0; border-radius: 5px; padding: 0 12px; font-size: 14px; font-weight: 500; background: #F0F0F0; color: #222; }
+    .chip.active { background: #222; color: #fff; }
+    main { display: grid; min-height: calc(100vh - 9rem); }
+    main.with-board { grid-template-columns: 1fr 560px; }
+    .grid-wrap { padding: 24px 32px 80px; }
+    .masonry { column-count: 5; column-gap: 16px; }
+    @media (max-width: 1280px) { .masonry { column-count: 4; } }
+    @media (max-width: 900px) { .masonry { column-count: 2; } main.with-board { grid-template-columns: 1fr; } }
+    .card { break-inside: avoid; margin-bottom: 16px; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,.06); cursor: pointer; }
+    .card img { display: block; width: 100%; height: auto; }
+    .text-card { min-height: 180px; display: flex; align-items: center; justify-content: center; padding: 20px 16px; }
+    .text-card:hover { background: #F5F53D; }
+    .text-card p { margin: 0; text-align: center; font-size: 28px; font-weight: 500; line-height: 1.25; }
+    .board {
+      display: none; border-left: 1px solid #E5E5E5; background: #fff; min-height: 70vh;
+      background-image: radial-gradient(#E5E5E5 1px, transparent 1px); background-size: 24px 24px;
+      padding: 24px;
+    }
+    main.with-board .board { display: block; }
+    .board h3 { margin: 0 0 12px; font-size: 14px; font-weight: 500; }
+    .board-item { margin-bottom: 12px; background: #fff; border: 1px solid #E5E5E5; padding: 8px; }
+    .board-item img { width: 100%; height: auto; display: block; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.2); z-index: 55; }
+    .suggest {
+      position: fixed; z-index: 60; background: #F0F0F0; border-radius: 8px; padding: 20px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .suggest p { margin: 0; font-size: 12px; font-weight: 500; }
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag { height: 32px; border: 1px solid #E5E5E5; border-radius: 5px; background: #fff; padding: 0 12px; font-size: 14px; font-weight: 500; }
+    .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 80; display: flex; align-items: center; justify-content: center; }
+    .modal { width: 520px; max-width: calc(100vw - 2rem); background: #fff; border-radius: 5px; padding: 32px; }
+    .modal h2 { margin: 0 0 8px; font-size: 18px; }
+    .modal .hint { margin: 0 0 16px; font-size: 13px; color: #848484; }
+    .modal label { display: block; font-size: 13px; margin: 12px 0 6px; }
+    .modal input { width: 100%; height: 36px; border: 0; border-radius: 5px; background: #F0F0F0; padding: 0 12px; font-size: 14px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .btn-gray { height: 32px; border: 0; border-radius: 5px; background: #F0F0F0; padding: 0 16px; font-size: 14px; }
+    .detail { max-width: 1440px; margin: 0 auto 24px; border-top: 1px solid #E5E5E5; border-bottom: 1px solid #E5E5E5; padding: 20px 40px; }
+    .detail h2 { margin: 0; font-size: 48px; font-weight: 500; line-height: 1.25; }
+    .detail-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .back { width: 32px; height: 32px; border: 0; background: none; font-size: 20px; margin: 8px 40px; }
+    .empty { border: 1px dashed #E5E5E5; border-radius: 8px; padding: 64px 16px; text-align: center; color: #848484; font-size: 14px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="sticky">
+    <header>
+      <div class="header-row">
+        <button class="logo" id="homeBtn" type="button" aria-label="홈">
+          <span class="logo-mark"></span>
+          <span class="logo-type">IDEAVE</span>
+        </button>
+        <button class="project-btn" id="projectBtn" type="button">프로젝트 등록하기</button>
+        <div class="header-right">
+          <button class="ghost" type="button">만들기</button>
+          <button class="avatar" type="button" aria-label="프로필"></button>
+        </div>
+      </div>
+    </header>
+    <div class="search-bar">
+      <label class="search-box">
+        <input id="search" type="search" placeholder="해시태그 또는 키워드 검색" />
+        <button class="icon-btn" id="searchBtn" type="button" aria-label="검색 실행">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.25" stroke="currentColor" stroke-width="1.4"/><path d="M10.2 10.2L13.5 13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+      </label>
+      <button class="canvas-btn" id="canvasBtn" type="button">캔버스</button>
+    </div>
+    <nav class="filters" aria-label="레퍼런스 필터">
+      <button class="chip active" data-filter="all" type="button">전체</button>
+      <button class="chip" data-filter="image" type="button">이미지</button>
+      <button class="chip" data-filter="text" type="button">텍스트</button>
+    </nav>
+  </div>
+
+  <div class="overlay hidden" id="overlay"></div>
+  <div class="suggest hidden" id="suggest">
+    <p>해시태그</p>
+    <div class="tags" id="tagList"></div>
+  </div>
+
+  <main id="main">
+    <section class="grid-wrap">
+      <button class="back hidden" id="backBtn" type="button" aria-label="뒤로">‹</button>
+      <div class="detail hidden" id="detail"></div>
+      <div class="masonry" id="grid"></div>
+      <div class="empty hidden" id="empty">해당하는 레퍼런스를 찾지 못했습니다.</div>
+    </section>
+    <aside class="board" id="board">
+      <h3>캔버스</h3>
+      <p style="font-size:13px;color:#848484;margin:0 0 16px;">카드를 클릭해 저장한 레퍼런스가 여기에 쌓입니다.</p>
+      <div id="boardList"></div>
+    </aside>
+  </main>
+
+  <div class="modal-back hidden" id="projectModal">
+    <div class="modal">
+      <h2>프로젝트 등록</h2>
+      <p class="hint">수집할 레퍼런스의 주제와 목적 설정</p>
+      <label for="pName">프로젝트 주제</label>
+      <input id="pName" placeholder="이 프로젝트로 무엇을 만들고 싶나요?" />
+      <label for="pGoal">프로젝트 스타일 및 무드</label>
+      <input id="pGoal" placeholder="예: 레트로하고 따뜻한 느낌" />
+      <div class="modal-actions">
+        <button class="btn-gray" id="projectClose" type="button">닫기</button>
+        <button class="canvas-btn" id="projectStart" type="button">프로젝트 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TEXTS = [
+      "네거티브 스페이스","그리드 시스템","타이포그래피","컬러 블로킹","대칭·균형",
+      "바우하우스","스위스 스타일","미니멀리즘","브루탈리즘","인상주의",
+      "초현실주의","팝아트","수채 화풍","라인 드로잉","플랫 일러스트","필름 그레인","모노톤","파스텔 톤"
+    ];
+    const IMAGES = [
+      { src: "https://images.unsplash.com/photo-1605106702842-01a887a31122?auto=format&fit=crop&w=800&q=80", tags: "기하 그래픽 패턴", h: 1.25 },
+      { src: "https://images.unsplash.com/photo-1515443423862-b79d32c1b8f7?auto=format&fit=crop&w=800&q=80", tags: "에디토리얼 레이아웃", h: 1.4 },
+      { src: "https://images.unsplash.com/photo-1490013616775-3ca8865fb129?auto=format&fit=crop&w=800&q=80", tags: "타이포그래피 포스터", h: 1.15 },
+      { src: "https://images.unsplash.com/photo-1605106250963-ffda6d2a4b32?auto=format&fit=crop&w=800&q=80", tags: "미니멀 기하", h: 1.3 },
+      { src: "https://images.unsplash.com/photo-1635621456241-16e4a3a009a0?auto=format&fit=crop&w=800&q=80", tags: "브루탈리즘 텍스처", h: 1.5 },
+      { src: "https://images.unsplash.com/photo-1605106325682-3482f7c1c9c4?auto=format&fit=crop&w=800&q=80", tags: "하프톤 패턴", h: 1.2 },
+      { src: "https://images.unsplash.com/photo-1592966719124-2ca2978ba325?auto=format&fit=crop&w=800&q=80", tags: "파스텔 무드", h: 1.35 },
+      { src: "https://images.unsplash.com/photo-1620285716602-c697e120c0c1?auto=format&fit=crop&w=800&q=80", tags: "모노톤 대비", h: 1.1 },
+      { src: "https://images.unsplash.com/photo-1605106901227-991bd663255c?auto=format&fit=crop&w=800&q=80", tags: "그래픽 추상", h: 1.45 },
+      { src: "https://images.unsplash.com/photo-1723220217618-6f137cd9f991?auto=format&fit=crop&w=800&q=80", tags: "에디토리얼 컬러", h: 1.22 },
+      { src: "https://images.unsplash.com/photo-1647675975434-864e1c3fc98d?auto=format&fit=crop&w=800&q=80", tags: "기하 옐로우", h: 1.18 },
+      { src: "https://images.unsplash.com/photo-1605106701227-3bb6b0fa8d2b?auto=format&fit=crop&w=800&q=80", tags: "레트로 포스터", h: 1.33 }
+    ];
+    const HASHTAGS = ["#타이포그래피","#기하","#에디토리얼","#하프톤","#미니멀리즘","#브루탈리즘","#파스텔","#모노톤"];
+
+    const state = { filter: "all", query: "", boardOpen: false, board: [], detail: null, project: null };
+
+    const grid = document.getElementById("grid");
+    const empty = document.getElementById("empty");
+    const main = document.getElementById("main");
+    const overlay = document.getElementById("overlay");
+    const suggest = document.getElementById("suggest");
+    const tagList = document.getElementById("tagList");
+    const search = document.getElementById("search");
+    const detail = document.getElementById("detail");
+    const backBtn = document.getElementById("backBtn");
+    const boardList = document.getElementById("boardList");
+    const projectModal = document.getElementById("projectModal");
+    const projectBtn = document.getElementById("projectBtn");
+
+    tagList.innerHTML = HASHTAGS.map((t) => `<button class="tag" type="button">${t}</button>`).join("");
+
+    function items() {
+      const q = state.query.replace(/^#/, "").toLowerCase();
+      const mixed = [];
+      IMAGES.forEach((img, i) => {
+        mixed.push({ type: "image", ...img, id: "img-" + i });
+        if (TEXTS[i]) mixed.push({ type: "text", label: TEXTS[i], id: "txt-" + i });
+      });
+      TEXTS.slice(IMAGES.length).forEach((label, i) => mixed.push({ type: "text", label, id: "txt-more-" + i }));
+      return mixed.filter((item) => {
+        if (state.filter === "image" && item.type !== "image") return false;
+        if (state.filter === "text" && item.type !== "text") return false;
+        if (!q) return true;
+        const hay = ((item.tags || "") + " " + (item.label || "")).toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    function render() {
+      const list = items();
+      empty.classList.toggle("hidden", list.length > 0);
+      grid.classList.toggle("hidden", list.length === 0);
+      grid.innerHTML = list.map((item) => {
+        if (item.type === "text") {
+          return `<article class="card text-card" data-id="${item.id}"><p>${item.label}</p></article>`;
+        }
+        return `<article class="card" data-id="${item.id}"><img src="${item.src}" alt="${item.tags}" /></article>`;
+      }).join("");
+      main.classList.toggle("with-board", state.boardOpen);
+      backBtn.classList.toggle("hidden", !state.detail);
+      if (!state.detail) {
+        detail.classList.add("hidden");
+        detail.innerHTML = "";
+      } else if (state.detail.type === "text") {
+        detail.classList.remove("hidden");
+        detail.innerHTML = `<div class="detail-head"><h2>${state.detail.label}</h2><button class="canvas-btn" type="button" data-save="${state.detail.id}">캔버스에 저장</button></div>
+          <p style="margin:16px 0 0;font-size:14px;line-height:1.6;">시각 레퍼런스를 탐색할 때 쓰는 디자인 키워드입니다. 관련 이미지는 아래 그리드에서 확인하세요.</p>`;
+      } else {
+        detail.classList.remove("hidden");
+        detail.innerHTML = `<div class="detail-head"><img src="${state.detail.src}" alt="" style="max-height:360px;width:auto;" /><div>
+          <p style="font-size:14px;color:#848484;">${state.detail.tags}</p>
+          <button class="canvas-btn" type="button" data-save="${state.detail.id}" style="margin-top:16px;">캔버스에 저장</button>
+        </div></div>`;
+      }
+      boardList.innerHTML = state.board.map((item) => item.type === "text"
+        ? `<div class="board-item"><strong>${item.label}</strong></div>`
+        : `<div class="board-item"><img src="${item.src}" alt="" /></div>`).join("") || `<p style="color:#848484;font-size:13px;">아직 비어 있습니다.</p>`;
+      if (state.project) projectBtn.textContent = state.project.name;
+    }
+
+    function allItems() {
+      return items().concat(IMAGES.map((img, i) => ({ type: "image", ...img, id: "img-" + i })), TEXTS.map((label, i) => ({ type: "text", label, id: "txt-" + i })));
+    }
+
+    function findItem(id) {
+      return allItems().find((item) => item.id === id);
+    }
+
+    function openSuggest() {
+      const box = document.querySelector(".search-box").getBoundingClientRect();
+      suggest.style.top = box.bottom + 8 + "px";
+      suggest.style.left = box.left + "px";
+      suggest.style.width = box.width + "px";
+      overlay.classList.remove("hidden");
+      suggest.classList.remove("hidden");
+    }
+
+    function closeSuggest() {
+      overlay.classList.add("hidden");
+      suggest.classList.add("hidden");
+    }
+
+    document.querySelectorAll("[data-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.filter = btn.dataset.filter;
+        document.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("active", b === btn));
+        state.detail = null;
+        render();
+      });
+    });
+
+    search.addEventListener("focus", openSuggest);
+    search.addEventListener("click", openSuggest);
+    search.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        state.query = search.value.trim();
+        state.detail = null;
+        closeSuggest();
+        render();
+      }
+    });
+    document.getElementById("searchBtn").addEventListener("click", () => {
+      state.query = search.value.trim();
+      state.detail = null;
+      closeSuggest();
+      render();
+    });
+    overlay.addEventListener("click", closeSuggest);
+    tagList.addEventListener("click", (e) => {
+      const btn = e.target.closest(".tag");
+      if (!btn) return;
+      search.value = btn.textContent;
+      state.query = btn.textContent;
+      state.detail = null;
+      closeSuggest();
+      render();
+    });
+    grid.addEventListener("click", (e) => {
+      const card = e.target.closest("[data-id]");
+      if (!card) return;
+      state.detail = findItem(card.dataset.id);
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    backBtn.addEventListener("click", () => { state.detail = null; render(); });
+    document.body.addEventListener("click", (e) => {
+      const save = e.target.closest("[data-save]");
+      if (!save) return;
+      const item = findItem(save.dataset.save);
+      if (item) state.board.push(item);
+      state.boardOpen = true;
+      render();
+    });
+    document.getElementById("canvasBtn").addEventListener("click", () => {
+      state.boardOpen = !state.boardOpen;
+      render();
+    });
+    document.getElementById("homeBtn").addEventListener("click", () => {
+      state.query = "";
+      search.value = "";
+      state.filter = "all";
+      state.detail = null;
+      document.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("active", b.dataset.filter === "all"));
+      render();
+    });
+    projectBtn.addEventListener("click", () => projectModal.classList.remove("hidden"));
+    document.getElementById("projectClose").addEventListener("click", () => projectModal.classList.add("hidden"));
+    document.getElementById("projectStart").addEventListener("click", () => {
+      const name = document.getElementById("pName").value.trim();
+      const goal = document.getElementById("pGoal").value.trim();
+      if (name) state.project = { name, goal };
+      projectModal.classList.add("hidden");
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
