@@ -115,9 +115,10 @@ export function ProjectRegisterModal({
     setProjectName(initialProject?.name ?? "");
     setGoal(initialProject?.goal ?? "");
     setError("");
-    setIsEditingFields(false);
+    // 오른쪽 패널은 열자마자 바로 고칠 수 있게 수정 상태로 연다.
+    setIsEditingFields(isPanel);
     setConfirmResetOpen(false);
-  }, [open, initialProject]);
+  }, [open, initialProject, isPanel]);
 
   if (!open) {
     return null;
@@ -150,7 +151,7 @@ export function ProjectRegisterModal({
     setProjectName("");
     setGoal("");
     setError("");
-    setIsEditingFields(false);
+    setIsEditingFields(isPanel);
     setConfirmResetOpen(false);
   };
 
@@ -252,8 +253,8 @@ export function ProjectRegisterModal({
             <button type="button" onClick={requestResetConfirm} className={SECONDARY_BUTTON_CLASS}>
               초기화
             </button>
-            {/* 좁은 오른쪽 패널에선 등록된 프로젝트가 있을 때만 수정 버튼을 둔다. */}
-            {isPanel && !hasExistingProject ? null : <button
+            {/* 오른쪽 패널은 늘 수정 상태라 수정 버튼이 없다. */}
+            {isPanel ? null : <button
               type="button"
               onClick={handleEnterEditMode}
               disabled={!editButtonActive}

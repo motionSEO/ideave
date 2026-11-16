@@ -4610,7 +4610,7 @@ export function ReferencePrototypePage() {
           projectModalOpen
             ? "right-[min(400px,calc(100vw-3rem))] z-[48]"
             : boardOpen
-              ? "right-0 z-[46] lg:right-[calc(var(--board-w)-var(--index-tab-w))]"
+              ? "right-0 z-[46] lg:right-[var(--board-w)]"
               : "right-0 z-[46]"
         }`}
       >
@@ -4618,7 +4618,13 @@ export function ReferencePrototypePage() {
           label={project ? project.name : "프로젝트 등록"}
           tone="dark"
           active={projectModalOpen}
-          onClick={() => setProjectModalOpen((prev) => !prev)}
+          onClick={() => {
+            // 프로젝트 패널을 열 땐 캔버스를 닫아 한 번에 한 패널만 보이게 한다.
+            if (!projectModalOpen) {
+              setBoardOpen(false);
+            }
+            setProjectModalOpen((prev) => !prev);
+          }}
         />
         <IndexTab
           label="캔버스"
