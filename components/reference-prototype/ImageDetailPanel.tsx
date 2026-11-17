@@ -67,6 +67,7 @@ export function ImageDetailPanel({
   onTagClick,
   onDragStart,
 }: ImageDetailPanelProps) {
+  const description = item.description?.trim() ?? "";
   const bundleClass = compact
     ? "flex min-w-0 max-w-full self-stretch items-start justify-center gap-5 border-y border-[#E5E5E5] px-4 py-5"
     : "flex self-stretch items-start justify-center gap-10 border-y border-[#E5E5E5] px-10 py-5";
@@ -123,7 +124,17 @@ export function ImageDetailPanel({
 
         <div className={infoColumnClass}>
           <div className={IMAGE_DETAIL_INFO_STACK_CLASS}>
-            <h2 className={`w-full ${IMAGE_DETAIL_MUTED_TEXT_CLASS}`}>{title}</h2>
+            {/* 파일 이름 대신 AI가 이미지의 시각적 특징·주제를 요약한 한 문장을 제목으로 쓴다(없으면 파일 이름). */}
+            {description ? (
+              <h2
+                title={title}
+                className="w-full font-[family-name:var(--font-pretendard)] text-[18px] font-medium leading-[1.45] text-[#222222] [word-break:keep-all]"
+              >
+                {description}
+              </h2>
+            ) : (
+              <h2 className={`w-full ${IMAGE_DETAIL_MUTED_TEXT_CLASS}`}>{title}</h2>
+            )}
 
             <div className={IMAGE_DETAIL_FIELD_GROUP_CLASS}>
               <p className={IMAGE_DETAIL_LABEL_TEXT_CLASS}>링크</p>
