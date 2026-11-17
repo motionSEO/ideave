@@ -158,6 +158,12 @@ function boardFitScale(viewW: number, viewH: number): number {
   return Number.isFinite(fit) && fit > 0 ? fit : MIN_ZOOM;
 }
 
+// 캔버스 Ctrl/⌘+휠·터치패드 핀치 확대: 휠 이동량 1px당 배율 변화(지수), 이벤트 하나에서 쓰는 최대 이동량,
+// 매 프레임 남은 배율 차이를 따라가는 비율. 마우스 휠 한 칸(약 100px → 40으로 제한) ≈ 6%.
+const BOARD_WHEEL_ZOOM_SPEED = 0.0015;
+const BOARD_WHEEL_DELTA_CAP = 40;
+const BOARD_WHEEL_ZOOM_EASE = 0.22;
+
 function clampBoardScale(value: number, viewW = 480, viewH = 720): number {
   const min = boardFitScale(viewW, viewH);
   return Math.min(MAX_ZOOM, Math.max(min, value));
@@ -4440,14 +4446,42 @@ export function ReferencePrototypePage() {
         return;
       }
       if (event.ctrlKey || event.metaKey) {
-        zoomBoardAtClient(event.clientX, event.clientY, event.deltaY < 0 ? 1.08 : 1 / 1.08);
+        // 이벤트마다 고정 8%씩 키우면 터치패드 핀치(한 동작에 수십 번 발생)가 확 튀므로,
+        // 휠 이동량에 비례해 목표 배율만 정하고 실제 배율은 아래 애니메이션이 부드럽게 따라가게 한다.
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? el.clientHeight : 1;
+        const delta = Math.max(-BOARD_WHEEL_DELTA_CAP, Math.min(BOARD_WHEEL_DELTA_CAP, event.deltaY * unit));
+        const base = zoomAnim.active ? zoomAnim.target : boardViewScaleRef.current;
+        zoomAnim.target = clampBoardScale(base * Math.exp(-delta * BOARD_WHEEL_ZOOM_SPEED), el.clientWidth, el.clientHeight);
+        zoomAnim.x = event.clientX;
+        zoomAnim.y = event.clientY;
+        if (!zoomAnim.active) {
+          zoomAnim.active = true;
+          zoomAnim.frame = window.requestAnimationFrame(stepZoom);
+        }
         return;
       }
       panBoardBy(-event.deltaX, -event.deltaY);
     };
 
+    const zoomAnim = { active: false, target: boardViewScaleRef.current, x: 0, y: 0, frame: 0 };
+    const stepZoom = () => {
+      const current = boardViewScaleRef.current;
+      const ratio = zoomAnim.target / current;
+      if (Math.abs(ratio - 1) < 0.002) {
+        zoomBoardAtClient(zoomAnim.x, zoomAnim.y, ratio);
+        zoomAnim.active = false;
+        return;
+      }
+      // 남은 배율 차이의 일부만 매 프레임 따라가 감속하듯 멈춘다.
+      zoomBoardAtClient(zoomAnim.x, zoomAnim.y, Math.pow(ratio, BOARD_WHEEL_ZOOM_EASE));
+      zoomAnim.frame = window.requestAnimationFrame(stepZoom);
+    };
+
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      window.cancelAnimationFrame(zoomAnim.frame);
+    };
   }, [boardOpen, panBoardBy, zoomBoardAtClient]);
 
   const onBoardSurfaceMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
