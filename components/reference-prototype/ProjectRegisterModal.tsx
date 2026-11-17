@@ -21,7 +21,7 @@ const MODAL_CLASS =
 
 // 오른쪽 인덱스 패널: 화면 맨 위부터 깔아 상단 고정 영역(z-50) 아래 틈까지 흰 면으로 채운다.
 const PANEL_CLASS =
-  "fixed bottom-0 right-0 top-0 z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col bg-white px-8 pb-8 pt-[calc(8.25rem+2rem)] shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-x-full";
+  "fixed bottom-0 right-0 top-0 z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col bg-white px-8 pb-8 pt-[12.5rem] shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-x-full";
 
 const FIELD_LABEL_CLASS =
   "font-[family-name:var(--font-pretendard)] text-[14px] font-medium leading-normal text-[#222222]";

@@ -4627,7 +4627,7 @@ export function ReferencePrototypePage() {
       {/* 화면 오른쪽 인덱스 탭: 프로젝트(다크) / 캔버스(라임). 캔버스를 펼치면 패널 왼쪽 안쪽 여백으로 따라 들어간다. */}
       <nav
         aria-label="프로젝트와 캔버스"
-        className={`fixed top-[calc(8.25rem+24px)] flex flex-col items-end gap-2 ${
+        className={`fixed top-[12.5rem] flex flex-col items-end gap-2 ${
           boardPanelResizing ? "" : `transition-[right] ${SIDE_PANEL_SLIDE_CLASS}`
         } ${
           projectModalOpen
