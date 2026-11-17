@@ -18,6 +18,8 @@ type ReferenceCardProps = {
   variant?: "default" | "ideave";
   /** 텍스트 카드에 실로 꿰어 보여줄 엮인 이미지(키워드와 태그가 겹치는 수집 이미지) */
   wovenImages?: { thumbs: string[]; total: number };
+  /** 이미지 카드 뒷면 키워드 버튼을 눌렀을 때(검색창에 넣고 검색) */
+  onBackKeywordClick?: (keyword: string) => void;
 };
 
 // 텍스트 카드 관련 이미지 스택(T-2a): 사진 한 변, 사진끼리 밀리는 거리. 호버 때 바깥 사진은 17px 더 벌어진다(아래 클래스).
@@ -137,32 +139,43 @@ function resolveUpperKeywords(tagLabels: string[], itemId: string): string[] {
   return pool.slice(0, 3);
 }
 
-const FLIP_ICON_PATH =
-  "M15.5455 7.22175H21V1.88702M21 7.22175L16.7818 3.34518C15.8048 2.38912 14.596 1.69071 13.2684 1.31511C11.9407 0.939518 10.5374 0.898983 9.18935 1.19729C7.84133 1.4956 6.59254 2.12302 5.55951 3.02102C4.52648 3.91902 3.74288 5.05833 3.28182 6.33263M6.45455 10.7782H1V16.113M1 10.7782L5.21818 14.6548C6.19522 15.6109 7.40397 16.3093 8.73164 16.6849C10.0593 17.0605 11.4626 17.101 12.8106 16.8027C14.1587 16.5044 15.4075 15.877 16.4405 14.979C17.4735 14.081 18.2571 12.9417 18.7182 11.6674";
+// 뒤집기 아이콘(P-3): 엇갈린 두 픽셀 화살표 ⇄. "X"가 한 칸(픽셀)이다.
+const FLIP_ICON_PIXEL_ROWS = [
+  "..X.....",
+  ".XX.....",
+  "XXXXXXXX",
+  ".XX.....",
+  "..X..X..",
+  ".....XX.",
+  "XXXXXXXX",
+  ".....XX.",
+  ".....X..",
+];
+const FLIP_ICON_PIXELS = FLIP_ICON_PIXEL_ROWS.flatMap((row, y) =>
+  [...row].flatMap((cell, x) => (cell === "X" ? [{ x, y }] : [])),
+);
 
 function FlipIcon() {
   return (
     <svg
-      width={20}
-      height={16}
-      viewBox="0 0 22 18"
-      fill="none"
-      className="block h-4 w-5 shrink-0"
+      width={16}
+      height={18}
+      viewBox="0 0 8 9"
+      fill="#F5F53D"
+      shapeRendering="crispEdges"
+      // 버튼에 마우스를 올리면 좌우로 뒤집힌다.
+      className="block h-[18px] w-4 shrink-0 transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/flip:-scale-x-100"
       aria-hidden
     >
-      <path
-        d={FLIP_ICON_PATH}
-        stroke="var(--hint-text-border, #848484)"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {FLIP_ICON_PIXELS.map(({ x, y }) => (
+        <rect key={`${x}-${y}`} x={x} y={y} width={1.02} height={1.02} />
+      ))}
     </svg>
   );
 }
 
 const FLIP_TOGGLE_BUTTON_CLASS =
-  "absolute bottom-2 right-2 z-[2] flex h-9 w-9 items-center justify-center rounded-lg bg-[#F0F0F0] opacity-0 pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto";
+  "group/flip absolute bottom-2 right-2 z-[2] flex h-9 w-9 items-center justify-center rounded-[3px] bg-[#222222] opacity-0 pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto";
 
 function FlipToggleButton({ onClick }: { onClick: (event: MouseEvent<HTMLButtonElement>) => void }) {
   return (
@@ -226,6 +239,7 @@ function FlippableImageCard({
   tagLabels,
   variant,
   front,
+  onBackKeywordClick,
 }: {
   item: ReferenceItem;
   compact: boolean;
@@ -236,6 +250,7 @@ function FlippableImageCard({
   tagLabels: string[];
   variant: "default" | "ideave";
   front: ReactNode;
+  onBackKeywordClick?: (keyword: string) => void;
 }) {
   const [flipped, setFlipped] = useState(false);
   const frontRef = useRef<HTMLDivElement | null>(null);
@@ -256,7 +271,7 @@ function FlippableImageCard({
     : `group relative w-full rounded-lg border ${selected ? "border-[#1A1A1A]" : "border-[#E5E7EB]"}`;
 
   const backClass =
-    "box-border flex min-h-full w-full flex-col justify-center gap-3 rounded-lg bg-white py-5 pr-5 pl-4 shadow-[inset_0_0_0_1px_#E5E7EB]";
+    "box-border flex min-h-full w-full flex-col justify-center gap-2.5 rounded-lg bg-white py-5 pr-5 pl-4 shadow-[inset_0_0_0_1px_#E5E7EB]";
 
   const flipCardInner = (
     <div className={`${shellClass} [perspective:1200px]`}>
@@ -281,13 +296,25 @@ function FlippableImageCard({
           }`}
         >
           <div className={`${backClass} h-full min-h-full`}>
-            <ul className="flex flex-col self-stretch">
+            {/* B-1: 키워드를 라임 칩으로 한 줄에 하나씩. 누르면 검색창에 넣고 검색한다. */}
+            <span className="font-[family-name:var(--font-pretendard)] text-[11px] font-semibold tracking-[0.08em] text-[#9A9A9A]">
+              KEYWORDS
+            </span>
+            <ul className="flex flex-col items-start gap-1.5 self-stretch">
               {upperKeywords.map((keyword, keywordIndex) => (
-                <li
-                  key={`${keywordIndex}-${keyword}`}
-                  className="self-stretch font-[family-name:var(--font-pretendard)] text-[14px] font-normal leading-6 text-black"
-                >
-                  {keyword}
+                <li key={`${keywordIndex}-${keyword}`} className="max-w-full">
+                  <button
+                    type="button"
+                    tabIndex={flipped ? 0 : -1}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      onBackKeywordClick?.(keyword);
+                    }}
+                    className="max-w-full cursor-pointer truncate rounded-[4px] bg-[#F5F53D] px-2.5 py-[7px] text-left font-[family-name:var(--font-pretendard)] text-[14px] font-semibold leading-none text-[#222222] transition-colors hover:bg-[#222222] hover:text-[#F5F53D]"
+                  >
+                    {keyword}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -345,6 +372,7 @@ export function ReferenceCard({
   onTagBadgeClick,
   variant = "ideave",
   wovenImages,
+  onBackKeywordClick,
 }: ReferenceCardProps) {
   const isIdeave = variant === "ideave";
   const tags = tagLabels ?? [];
@@ -434,6 +462,7 @@ export function ReferenceCard({
         tagLabels={tags}
         variant={variant}
         front={imageFront}
+        onBackKeywordClick={onBackKeywordClick}
       />
     );
 
@@ -473,6 +502,7 @@ export function ReferenceCard({
         tagLabels={tags}
         variant={variant}
         front={placeholderFront}
+        onBackKeywordClick={onBackKeywordClick}
       />
     );
 

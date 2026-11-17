@@ -2963,11 +2963,12 @@ export function ReferencePrototypePage() {
         tagLabels={item.type === "text" ? [] : getSearchTagsForItem(item)}
         activeTagFilter={badgeFilterTag}
         onTagBadgeClick={applyTagFilter}
+        onBackKeywordClick={searchFromSharedKeyword}
         variant="ideave"
         wovenImages={item.type === "text" && item.textLabel ? wovenImageLookup(item.textLabel) : undefined}
       />
     ),
-    [selectedId, selectExploreText, selectExploreImage, badgeFilterTag, applyTagFilter, beginDragToBoard, wovenImageLookup],
+    [selectedId, selectExploreText, selectExploreImage, badgeFilterTag, applyTagFilter, beginDragToBoard, wovenImageLookup, searchFromSharedKeyword],
   );
 
   useEffect(() => {
