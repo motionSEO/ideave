@@ -17,9 +17,9 @@ type ProjectRegisterModalProps = {
 const MODAL_CLASS =
   "relative z-[1] flex h-[370px] w-[800px] max-w-[calc(100vw-2rem)] flex-col rounded-[5px] bg-white p-10 shadow-xl";
 
-// 오른쪽 인덱스 패널: 헤더 아래부터 화면 끝까지, 왼쪽에 프로젝트 탭과 같은 다크 테두리.
+// 오른쪽 인덱스 패널: 화면 맨 위부터 깔아 상단 고정 영역(z-50) 아래 틈까지 흰 면으로 채운다.
 const PANEL_CLASS =
-  "fixed bottom-0 right-0 top-[8.25rem] z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col border-l-4 border-solid border-[#222222] bg-white p-8 shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-200 ease-out starting:translate-x-full";
+  "fixed bottom-0 right-0 top-0 z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col bg-white px-8 pb-8 pt-[calc(8.25rem+2rem)] shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-200 ease-out starting:translate-x-full";
 
 const FIELD_LABEL_CLASS =
   "font-[family-name:var(--font-pretendard)] text-[14px] font-medium leading-normal text-[#222222]";
