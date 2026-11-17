@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { CloseButton } from "@/components/reference-prototype/CloseIcon";
 
 type ProjectRegisterModalProps = {
   open: boolean;
   /** panel일 때 false면 닫히는 중: 오른쪽으로 밀려 들어간 뒤 open이 꺼진다. */
   shown?: boolean;
+  /** panel 왼쪽 바깥에 붙여 패널과 함께 움직일 요소(인덱스 탭). */
+  edgeSlot?: ReactNode;
   initialProject?: { name: string; goal: string } | null;
   onClose: () => void;
   onStart: (projectName: string, goal: string) => void;
@@ -77,6 +79,7 @@ export function ProjectRegisterModal({
   onReset,
   variant = "modal",
   shown = true,
+  edgeSlot = null,
 }: ProjectRegisterModalProps) {
   const isPanel = variant === "panel";
   const titleId = useId();
@@ -199,6 +202,7 @@ export function ProjectRegisterModal({
         className={isPanel ? `${PANEL_CLASS} ${shown ? "translate-x-0" : "translate-x-full"}` : MODAL_CLASS}
         onClick={(event) => event.stopPropagation()}
       >
+        {isPanel ? edgeSlot : null}
         <div className="flex flex-col gap-1">
           <div className="flex items-start justify-between gap-4">
             <h2

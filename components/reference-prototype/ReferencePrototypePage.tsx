@@ -4559,6 +4559,49 @@ export function ReferencePrototypePage() {
     setBoardOpen(true);
   };
 
+  // 인덱스 탭을 어디에 붙일지: 열려 있는(또는 닫히는 중인) 패널 안 → 함께 밀려 나오고 들어간다.
+  const indexTabsHost: "project" | "board" | "fixed" = projectModalOpen
+    ? "project"
+    : boardShown
+      ? "board"
+      : projectPanelMounted
+        ? "project"
+        : boardOpen
+          ? "board"
+          : "fixed";
+  const indexTabs = (
+    <>
+    <IndexTab
+      label={project ? project.name : "프로젝트 등록"}
+      tone="dark"
+      active={projectModalOpen}
+      detail={project ? { topic: project.name, keywords: splitProjectKeywords(project.goal) } : null}
+      onClick={() => {
+        // 프로젝트 패널을 열 땐 캔버스를 닫아 한 번에 한 패널만 보이게 한다.
+        if (!projectModalOpen) {
+          setBoardOpen(false);
+        }
+        setProjectModalOpen((prev) => !prev);
+      }}
+    />
+    <IndexTab
+      label="캔버스"
+      tone="lime"
+      active={boardShown && !projectModalOpen}
+      onClick={() => {
+        // 프로젝트 패널이 열려 있으면 닫고 캔버스를 보여 준다.
+        if (projectModalOpen) {
+          setProjectModalOpen(false);
+          setBoardOpen(true);
+          return;
+        }
+        setBoardOpen((prev) => !prev);
+      }}
+    />
+    </>
+  );
+  const indexTabsEdgeClass = "absolute right-full flex flex-col items-end gap-2";
+
   return (
     <div
       className="min-h-screen overflow-x-clip bg-white text-[#1A1A1A]"
@@ -4579,6 +4622,13 @@ export function ReferencePrototypePage() {
         onUpdate={handleProjectUpdate}
         onReset={handleProjectReset}
         variant="panel"
+        edgeSlot={
+          indexTabsHost === "project" ? (
+            <nav aria-label="프로젝트와 캔버스" className={`${indexTabsEdgeClass} top-[12.5rem]`}>
+              {indexTabs}
+            </nav>
+          ) : null
+        }
       />
       <CreateModal
         open={createModalOpen}
@@ -4674,49 +4724,18 @@ export function ReferencePrototypePage() {
         </div>
       ) : null}
 
-      {/* 화면 오른쪽 인덱스 탭: 프로젝트(다크) / 캔버스(라임). 캔버스를 펼치면 패널 왼쪽 안쪽 여백으로 따라 들어간다. */}
-      <nav
-        aria-label="프로젝트와 캔버스"
-        className={`fixed top-[12.5rem] flex flex-col items-end gap-2 ${
-          boardPanelResizing ? "" : `transition-[right] ${SIDE_PANEL_SLIDE_CLASS}`
-        } ${
-          projectModalOpen
-            ? "right-[min(400px,calc(100vw-3rem))] z-[48]"
-            : boardShown
-              ? "right-0 z-[46] lg:right-[var(--board-w)]"
-              : projectPanelMounted
-                ? "right-0 z-[48]"
-                : "right-0 z-[46]"
-        }`}
-      >
-        <IndexTab
-          label={project ? project.name : "프로젝트 등록"}
-          tone="dark"
-          active={projectModalOpen}
-          detail={project ? { topic: project.name, keywords: splitProjectKeywords(project.goal) } : null}
-          onClick={() => {
-            // 프로젝트 패널을 열 땐 캔버스를 닫아 한 번에 한 패널만 보이게 한다.
-            if (!projectModalOpen) {
-              setBoardOpen(false);
-            }
-            setProjectModalOpen((prev) => !prev);
-          }}
-        />
-        <IndexTab
-          label="캔버스"
-          tone="lime"
-          active={boardShown && !projectModalOpen}
-          onClick={() => {
-            // 프로젝트 패널이 열려 있으면 닫고 캔버스를 보여 준다.
-            if (projectModalOpen) {
-              setProjectModalOpen(false);
-              setBoardOpen(true);
-              return;
-            }
-            setBoardOpen((prev) => !prev);
-          }}
-        />
-      </nav>
+      {/* 화면 오른쪽 인덱스 탭: 프로젝트(다크) / 캔버스(라임).
+          패널이 닫혀 있을 땐 화면 오른쪽 끝에 고정하고, 패널이 열리면 그 패널 안(왼쪽 바깥)에 붙여 패널과 한 몸으로 움직인다. */}
+      {indexTabsHost === "fixed" || indexTabsHost === "board" ? (
+        <nav
+          aria-label="프로젝트와 캔버스"
+          className={`fixed right-0 top-[12.5rem] z-[46] flex flex-col items-end gap-2 ${
+            indexTabsHost === "board" ? "lg:hidden" : ""
+          }`}
+        >
+          {indexTabs}
+        </nav>
+      ) : null}
 
       <div ref={stickyChromeRef} className="sticky top-0 z-50 w-full">
         <header className="bg-[#222222]">
@@ -5034,6 +5053,12 @@ export function ReferencePrototypePage() {
         {/* select-none: 캔버스 여백에서 끌기 시작하면 브라우저가 카드 이미지를 파랗게 '텍스트 선택'하는 것을 막는다(텍스트 편집은 textarea라 영향 없음). */}
         {boardOpen && (
           <aside className={`sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
+            {indexTabsHost === "board" ? (
+              // 화면 기준 top 12.5rem = 캔버스 패널(top 8.25rem) 안에서 4.25rem 아래.
+              <nav aria-label="프로젝트와 캔버스" className={`${indexTabsEdgeClass} top-[4.25rem] z-20`}>
+                {indexTabs}
+              </nav>
+            ) : null}
             {/* 왼쪽 경계를 끌어 캔버스 너비 조절. 탐색 그리드가 2칸 아래로 줄지 않게 clampBoardPanelWidth가 막는다. */}
             <div
               role="separator"
