@@ -118,6 +118,9 @@ const BOARD_PANEL_INNER_GUTTER_PX = 80;
 const BOARD_PANEL_WIDTH_STORAGE_KEY = "ideave.boardPanelWidth";
 // 화면 오른쪽 인덱스 탭(프로젝트·캔버스) 너비. 캔버스가 닫혀 있을 땐 탐색 그리드 오른쪽 여백에 이만큼 더 비우고,
 // 열려 있을 땐 캔버스 패널 왼쪽 안쪽 여백(BOARD_PANEL_INNER_GUTTER_PX의 절반 40px)에 탭을 넣어 그리드 칸 수를 지킨다.
+// 홈 그리드 위 여백: 상단 바 아래 전체/이미지/텍스트 필터 줄(약 57px)이 떠 있을 때도 첫 줄 이미지를 가리지 않고,
+// 필터 줄이 숨은 맨 위 상태에선 상단 바와 이미지 사이가 넉넉히 떨어져 보이게 한다.
+const EXPLORE_HOME_TOP_PAD_PX = 80;
 const INDEX_TAB_PX = 36;
 // 인덱스 패널(프로젝트·캔버스)이 오른쪽에서 밀려 나오고 들어가는 시간. 탭과 패널이 같은 값으로 움직여 붙어 다닌다.
 const SIDE_PANEL_SLIDE_MS = 320;
@@ -4926,7 +4929,7 @@ export function ReferencePrototypePage() {
       >
         <section
           className={`min-w-0 pb-6 pl-8 ${boardOpen ? "pr-[calc(2rem+var(--index-tab-w))] lg:pr-8" : "pr-[calc(2rem+var(--index-tab-w))]"}`}
-          style={{ paddingTop: isDetailExplore ? Math.max(24, detailChromePad + 12) : 24 }}
+          style={{ paddingTop: isDetailExplore ? Math.max(24, detailChromePad + 12) : EXPLORE_HOME_TOP_PAD_PX }}
         >
           <div
             ref={exploreTopRef}
