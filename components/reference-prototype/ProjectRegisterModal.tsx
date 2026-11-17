@@ -5,6 +5,8 @@ import { CloseButton } from "@/components/reference-prototype/CloseIcon";
 
 type ProjectRegisterModalProps = {
   open: boolean;
+  /** panel일 때 false면 닫히는 중: 오른쪽으로 밀려 들어간 뒤 open이 꺼진다. */
+  shown?: boolean;
   initialProject?: { name: string; goal: string } | null;
   onClose: () => void;
   onStart: (projectName: string, goal: string) => void;
@@ -19,7 +21,7 @@ const MODAL_CLASS =
 
 // 오른쪽 인덱스 패널: 화면 맨 위부터 깔아 상단 고정 영역(z-50) 아래 틈까지 흰 면으로 채운다.
 const PANEL_CLASS =
-  "fixed bottom-0 right-0 top-0 z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col bg-white px-8 pb-8 pt-[calc(8.25rem+2rem)] shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-200 ease-out starting:translate-x-full";
+  "fixed bottom-0 right-0 top-0 z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col bg-white px-8 pb-8 pt-[calc(8.25rem+2rem)] shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-x-full";
 
 const FIELD_LABEL_CLASS =
   "font-[family-name:var(--font-pretendard)] text-[14px] font-medium leading-normal text-[#222222]";
@@ -74,6 +76,7 @@ export function ProjectRegisterModal({
   onUpdate,
   onReset,
   variant = "modal",
+  shown = true,
 }: ProjectRegisterModalProps) {
   const isPanel = variant === "panel";
   const titleId = useId();
@@ -193,7 +196,7 @@ export function ProjectRegisterModal({
         role="dialog"
         aria-modal={isPanel ? undefined : "true"}
         aria-labelledby={titleId}
-        className={isPanel ? PANEL_CLASS : MODAL_CLASS}
+        className={isPanel ? `${PANEL_CLASS} ${shown ? "translate-x-0" : "translate-x-full"}` : MODAL_CLASS}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex flex-col gap-1">

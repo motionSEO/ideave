@@ -119,6 +119,9 @@ const BOARD_PANEL_WIDTH_STORAGE_KEY = "ideave.boardPanelWidth";
 // 화면 오른쪽 인덱스 탭(프로젝트·캔버스) 너비. 캔버스가 닫혀 있을 땐 탐색 그리드 오른쪽 여백에 이만큼 더 비우고,
 // 열려 있을 땐 캔버스 패널 왼쪽 안쪽 여백(BOARD_PANEL_INNER_GUTTER_PX의 절반 40px)에 탭을 넣어 그리드 칸 수를 지킨다.
 const INDEX_TAB_PX = 36;
+// 인덱스 패널(프로젝트·캔버스)이 오른쪽에서 밀려 나오고 들어가는 시간. 탭과 패널이 같은 값으로 움직여 붙어 다닌다.
+const SIDE_PANEL_SLIDE_MS = 320;
+const SIDE_PANEL_SLIDE_CLASS = "duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 // 탐색 그리드: 카드 240px, 간격 40px, 섹션 좌우 패딩(px-8) 64px. 캔버스를 넓혀도 최소 2칸은 남긴다.
 const EXPLORE_CARD_PX = 240;
 const EXPLORE_GAP_PX = 40;
@@ -1296,6 +1299,20 @@ function buildBoardKeywordPayloadItem(
 }
 
 /** 오른쪽 인덱스 탭. 두 탭은 크기·모양이 같고 색만 반전(dark = 다크 바탕+흰 글자, lime = 라임 바탕+다크 글자). */
+/** on이 꺼진 뒤에도 ms 동안 true를 유지해, 패널이 닫히는(밀려 들어가는) 모션이 끝난 다음에 사라지게 한다. */
+function useStaysOnFor(on: boolean, ms: number) {
+  const [lingering, setLingering] = useState(on);
+  useEffect(() => {
+    if (on) {
+      setLingering(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setLingering(false), ms);
+    return () => window.clearTimeout(timer);
+  }, [on, ms]);
+  return on || lingering;
+}
+
 function IndexTab({
   label,
   tone,
@@ -1371,7 +1388,9 @@ type IdeaveCanvasWorkspaceState = {
 export function ReferencePrototypePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [boardOpen, setBoardOpen] = useState(false);
+  // boardShown: 캔버스를 펼친 상태(탭·밀려 나오는 모션 기준). boardOpen: 닫힐 때 모션이 끝날 때까지 자리를 유지하는 레이아웃 기준.
+  const [boardShown, setBoardOpen] = useState(false);
+  const boardOpen = useStaysOnFor(boardShown, SIDE_PANEL_SLIDE_MS);
   const [boardPanelWidth, setBoardPanelWidth] = useState(BOARD_PANEL_DEFAULT_PX);
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [boardPanelResizing, setBoardPanelResizing] = useState(false);
@@ -1418,6 +1437,7 @@ export function ReferencePrototypePage() {
   const [boardExportOpen, setBoardExportOpen] = useState(false);
   const [boardExporting, setBoardExporting] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const projectPanelMounted = useStaysOnFor(projectModalOpen, SIDE_PANEL_SLIDE_MS);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [project, setProject] = useState<ProjectContext | null>(null);
   const [projectDiscoverQuery, setProjectDiscoverQuery] = useState<string | null>(null);
@@ -4491,7 +4511,7 @@ export function ReferencePrototypePage() {
 
   return (
     <div
-      className="min-h-screen bg-white text-[#1A1A1A]"
+      className="min-h-screen overflow-x-clip bg-white text-[#1A1A1A]"
       style={
         {
           "--board-w": `${boardPanelWidth}px`,
@@ -4501,7 +4521,8 @@ export function ReferencePrototypePage() {
       }
     >
       <ProjectRegisterModal
-        open={projectModalOpen}
+        open={projectPanelMounted}
+        shown={projectModalOpen}
         initialProject={project}
         onClose={() => setProjectModalOpen(false)}
         onStart={handleProjectStart}
@@ -4607,11 +4628,15 @@ export function ReferencePrototypePage() {
       <nav
         aria-label="프로젝트와 캔버스"
         className={`fixed top-[calc(8.25rem+24px)] flex flex-col items-end gap-2 ${
+          boardPanelResizing ? "" : `transition-[right] ${SIDE_PANEL_SLIDE_CLASS}`
+        } ${
           projectModalOpen
             ? "right-[min(400px,calc(100vw-3rem))] z-[48]"
-            : boardOpen
+            : boardShown
               ? "right-0 z-[46] lg:right-[var(--board-w)]"
-              : "right-0 z-[46]"
+              : projectPanelMounted
+                ? "right-0 z-[48]"
+                : "right-0 z-[46]"
         }`}
       >
         <IndexTab
@@ -4629,7 +4654,7 @@ export function ReferencePrototypePage() {
         <IndexTab
           label="캔버스"
           tone="lime"
-          active={boardOpen && !projectModalOpen}
+          active={boardShown && !projectModalOpen}
           onClick={() => {
             // 프로젝트 패널이 열려 있으면 닫고 캔버스를 보여 준다.
             if (projectModalOpen) {
@@ -4957,7 +4982,7 @@ export function ReferencePrototypePage() {
 
         {/* select-none: 캔버스 여백에서 끌기 시작하면 브라우저가 카드 이미지를 파랗게 '텍스트 선택'하는 것을 막는다(텍스트 편집은 textarea라 영향 없음). */}
         {boardOpen && (
-          <aside className="sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col">
+          <aside className={`sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
             {/* 왼쪽 경계를 끌어 캔버스 너비 조절. 탐색 그리드가 2칸 아래로 줄지 않게 clampBoardPanelWidth가 막는다. */}
             <div
               role="separator"
