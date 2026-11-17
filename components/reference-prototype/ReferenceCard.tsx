@@ -20,28 +20,50 @@ type ReferenceCardProps = {
   wovenImages?: { thumbs: string[]; total: number };
 };
 
-/** 텍스트 카드 "구슬 실": 엮인 이미지 썸네일이 핑크 실에 꿰어진 줄. 클릭은 카드(텍스트 상세)로 넘긴다. */
-function WovenBeads({ thumbs, total }: { thumbs: string[]; total: number }) {
-  const more = total - thumbs.length;
+// 텍스트 카드 관련 이미지 스택(T-2a): 사진 한 변, 사진끼리 밀리는 거리. 호버 때 바깥 사진은 17px 더 벌어진다(아래 클래스).
+const WOVEN_STACK_PHOTO_PX = 68;
+const WOVEN_STACK_OFFSET_PX = 38;
+// 바깥 사진의 기울기(평소 / 호버). 가운데 사진은 똑바로 둔다.
+const WOVEN_STACK_TILT = [
+  { rest: "-rotate-[4deg]", hover: "group-hover/textcard:-translate-x-[17px] group-hover/textcard:-rotate-[6deg]" },
+  { rest: "", hover: "" },
+  { rest: "rotate-[4deg]", hover: "group-hover/textcard:translate-x-[17px] group-hover/textcard:rotate-[6deg]" },
+];
+
+/** 텍스트 카드 관련 이미지: 사진 세 장이 살짝 기울어 겹쳐 있고, 카드에 마우스를 올리면 양옆으로 벌어진다. 클릭은 카드(텍스트 상세)로 넘긴다. */
+function WovenStack({ thumbs }: { thumbs: string[] }) {
+  const shown = thumbs.slice(0, 3);
+  // 사진이 1~2장이면 가운데 기준으로 놓이도록 기울기 자리를 고른다.
+  const slots = shown.length === 1 ? [1] : shown.length === 2 ? [0, 2] : [0, 1, 2];
   return (
-    <div className="pointer-events-none relative flex items-center gap-[10px]" aria-hidden>
-      <span className="absolute -left-2 top-1/2 h-[3px] -translate-y-1/2 bg-[#FF80FF]" style={{ right: more > 0 ? 28 : -8 }} />
-      {thumbs.map((src) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={src}
-          src={src}
-          alt=""
-          loading="lazy"
-          draggable={false}
-          className="relative h-11 w-11 rounded-[6px] border-2 border-white bg-[#E5E5E5] object-cover"
-        />
-      ))}
-      {more > 0 ? (
-        <span className="relative ml-0.5 font-[family-name:var(--font-pretendard)] text-[14px] font-medium text-[#848484]">
-          +{more}
-        </span>
-      ) : null}
+    <div
+      className="pointer-events-none relative shrink-0"
+      style={{
+        width: WOVEN_STACK_PHOTO_PX + WOVEN_STACK_OFFSET_PX * (shown.length - 1),
+        height: WOVEN_STACK_PHOTO_PX,
+      }}
+      aria-hidden
+    >
+      {shown.map((src, index) => {
+        const tilt = WOVEN_STACK_TILT[slots[index]];
+        return (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={src}
+            src={src}
+            alt=""
+            loading="lazy"
+            draggable={false}
+            style={{
+              left: WOVEN_STACK_OFFSET_PX * index,
+              width: WOVEN_STACK_PHOTO_PX,
+              height: WOVEN_STACK_PHOTO_PX,
+              zIndex: index + 1,
+            }}
+            className={`absolute top-0 rounded-[3px] border-2 border-white bg-[#E5E5E5] object-cover shadow-[0_2px_6px_rgba(0,0,0,0.14)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${tilt.rest} ${tilt.hover}`}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -340,18 +362,19 @@ export function ReferenceCard({
           onDragStart={() => onDragStart?.(item)}
         >
           <div
-            className={`box-border flex ${IDEAVE_EXPLORE_CARD_SIZE_CLASS} flex-col items-center justify-center gap-[26px] px-4 py-5 transition-[background-color,box-shadow] hover:bg-[#F5F53D] ${IDEAVE_EXPLORE_TEXT_CARD_SURFACE_CLASS} ${
+            className={`group/textcard box-border flex ${IDEAVE_EXPLORE_CARD_SIZE_CLASS} flex-col items-center justify-center gap-[22px] px-4 py-5 transition-[background-color,box-shadow] hover:bg-[#F5F53D] ${IDEAVE_EXPLORE_TEXT_CARD_SURFACE_CLASS} ${
               selected ? "ring-2 ring-[#1A1A1A]" : ""
             }`}
           >
             <p
-              className={`text-center text-[36px] font-medium leading-tight text-[#222222] ${
+              // 두 줄이 될 때 글자 중간이 아니라 띄어쓰기에서 줄을 바꾸고(keep-all), 두 줄 길이를 고르게(balance) 맞춘다.
+              className={`text-center text-[36px] font-medium leading-tight text-[#222222] [overflow-wrap:anywhere] [text-wrap:balance] [word-break:keep-all] ${
                 woven ? "line-clamp-2" : "line-clamp-3"
               }`}
             >
               {label}
             </p>
-            {woven ? <WovenBeads thumbs={woven.thumbs} total={woven.total} /> : null}
+            {woven ? <WovenStack thumbs={woven.thumbs} /> : null}
           </div>
         </article>
       );
