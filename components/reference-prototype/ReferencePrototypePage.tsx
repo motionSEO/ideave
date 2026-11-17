@@ -1313,30 +1313,80 @@ function useStaysOnFor(on: boolean, ms: number) {
   return on || lingering;
 }
 
+// 등록된 프로젝트 탭에 마우스를 올리면 왼쪽으로 펼쳐지는 주제·키워드 영역 너비(H-1).
+const INDEX_TAB_DETAIL_PX = 200;
+
+/** "레트로, 따뜻한 / 미니멀" 같은 스타일·무드 입력을 키워드 칩으로 나눈다. */
+function splitProjectKeywords(goal: string): string[] {
+  const parts = goal
+    .split(/[,，、·|/]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return (parts.length ? parts : [goal.trim()]).filter(Boolean).slice(0, 4);
+}
+
 function IndexTab({
   label,
   tone,
   active,
   onClick,
+  detail,
 }: {
   label: string;
   tone: "dark" | "lime";
   active: boolean;
   onClick: () => void;
+  /** 있으면 호버 시 높이는 그대로, 왼쪽으로 넓어지며 주제와 키워드를 보여 준다. */
+  detail?: { topic: string; keywords: string[] } | null;
 }) {
   const toneClass = tone === "dark" ? "bg-[#222222] text-white" : "bg-[#F5F53D] text-[#222222]";
+  const expandable = Boolean(detail) && !active;
+  const widthClass = active
+    ? "w-10"
+    : expandable
+      ? "w-[var(--index-tab-w)] hover:w-[calc(var(--index-tab-w)+200px)] focus-visible:w-[calc(var(--index-tab-w)+200px)]"
+      : "w-[var(--index-tab-w)] hover:w-10";
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      title={label}
-      className={`flex h-[150px] items-center justify-center overflow-hidden rounded-l-[4px] transition-[width] duration-150 ${toneClass} ${
-        active ? "w-10" : "w-[var(--index-tab-w)] hover:w-10"
-      }`}
+      title={detail ? undefined : label}
+      aria-label={detail ? `${detail.topic} · ${detail.keywords.join(", ")}` : undefined}
+      className={`group/tab flex h-[150px] items-stretch justify-end overflow-hidden rounded-l-[4px] ${
+        expandable ? `transition-[width] ${SIDE_PANEL_SLIDE_CLASS}` : "transition-[width] duration-150"
+      } ${toneClass} ${widthClass}`}
     >
-      <span className="max-h-[126px] overflow-hidden text-ellipsis whitespace-nowrap font-[family-name:var(--font-pretendard)] text-[13px] font-semibold tracking-[0.08em] [writing-mode:vertical-rl]">
-        {label}
+      {detail ? (
+        <span
+          aria-hidden
+          style={{ width: INDEX_TAB_DETAIL_PX }}
+          className={`flex shrink-0 translate-x-3 flex-col justify-center gap-2.5 py-4 pl-[18px] pr-1 text-left opacity-0 transition-[opacity,transform] ${SIDE_PANEL_SLIDE_CLASS} ${
+            expandable ? "group-hover/tab:translate-x-0 group-hover/tab:opacity-100 group-focus-visible/tab:translate-x-0 group-focus-visible/tab:opacity-100" : ""
+          }`}
+        >
+          <span className="font-[family-name:var(--font-pretendard)] text-[11px] font-semibold tracking-[0.08em] text-[#9A9A9A]">
+            PROJECT
+          </span>
+          <span className="truncate font-[family-name:var(--font-pretendard)] text-[18px] font-bold leading-[1.25]">
+            {detail.topic}
+          </span>
+          <span className="flex max-h-[52px] flex-wrap gap-1 overflow-hidden">
+            {detail.keywords.map((keyword) => (
+              <span
+                key={keyword}
+                className="whitespace-nowrap rounded-[3px] bg-[#F5F53D] px-2 py-[3px] font-[family-name:var(--font-pretendard)] text-[12px] font-semibold leading-normal text-[#222222]"
+              >
+                {keyword}
+              </span>
+            ))}
+          </span>
+        </span>
+      ) : null}
+      <span className="flex w-[var(--index-tab-w)] shrink-0 items-center justify-center group-aria-pressed/tab:w-10">
+        <span className="max-h-[126px] overflow-hidden text-ellipsis whitespace-nowrap font-[family-name:var(--font-pretendard)] text-[13px] font-semibold tracking-[0.08em] [writing-mode:vertical-rl]">
+          {label}
+        </span>
       </span>
     </button>
   );
@@ -4643,6 +4693,7 @@ export function ReferencePrototypePage() {
           label={project ? project.name : "프로젝트 등록"}
           tone="dark"
           active={projectModalOpen}
+          detail={project ? { topic: project.name, keywords: splitProjectKeywords(project.goal) } : null}
           onClick={() => {
             // 프로젝트 패널을 열 땐 캔버스를 닫아 한 번에 한 패널만 보이게 한다.
             if (!projectModalOpen) {
