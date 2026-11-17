@@ -34,7 +34,8 @@ type StoredToken = {
 
 function readEnv(names: string[]): string | null {
   for (const name of names) {
-    const value = getServerEnv(name);
+    // 대시보드에 붙여 넣을 때 따옴표·공백·줄바꿈이 같이 들어가도 Google이 거절하지 않게 걷어 낸다.
+    const value = getServerEnv(name)?.trim().replace(/^(["'])([\s\S]*)\1$/, "$2").trim();
     if (value) {
       return value;
     }
