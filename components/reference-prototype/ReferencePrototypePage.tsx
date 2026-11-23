@@ -1451,8 +1451,9 @@ export function ReferencePrototypePage() {
   const [boardShown, setBoardOpen] = useState(false);
   const boardOpen = useStaysOnFor(boardShown, SIDE_PANEL_SLIDE_MS);
   const [boardPanelWidth, setBoardPanelWidth] = useState(BOARD_PANEL_DEFAULT_PX);
+  // 캔버스 너비를 끄는 동안 너비 변수를 직접 덮어쓸 캔버스 패널
+  const boardAsideRef = useRef<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(1440);
-  const [boardPanelResizing, setBoardPanelResizing] = useState(false);
   const [filter, setFilter] = useState<"all" | "image" | "text">("all");
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState("");
@@ -4264,23 +4265,56 @@ export function ReferencePrototypePage() {
       return;
     }
     event.preventDefault();
+    const aside = boardAsideRef.current;
+    const handleLine = event.currentTarget.firstElementChild as HTMLElement | null;
     const startX = event.clientX;
     const startWidth = boardPanelWidth;
     let latest = startWidth;
-    setBoardPanelResizing(true);
+    let frame = 0;
+    // 끄는 동안엔 React 상태를 바꾸지 않는다(바꾸면 카드 수백 장인 화면 전체가 매번 다시 계산돼 버벅인다).
+    // 캔버스 패널 자신에게만 너비 변수를 덮어쓰고, 늘어난 만큼 왼쪽으로 겹쳐 펼쳐(음수 margin) 탐색 그리드는 그대로 둔다.
+    // 손을 떼는 순간 한 번만 상태에 반영해 그리드 칸 수를 맞춘다.
+    if (handleLine) {
+      handleLine.style.backgroundColor = "#222222";
+    }
     const previousCursor = document.body.style.cursor;
     document.body.style.cursor = "col-resize";
 
+    const paint = () => {
+      frame = 0;
+      if (!aside) {
+        return;
+      }
+      aside.style.setProperty("--board-w", `${latest}px`);
+      aside.style.setProperty("--board-inner-w", `${latest - BOARD_PANEL_INNER_GUTTER_PX}px`);
+      aside.style.marginLeft = `${startWidth - latest}px`;
+    };
     const move = (ev: MouseEvent) => {
       // 패널은 오른쪽에 붙어 있으므로 왼쪽으로 끌수록 넓어진다.
       latest = clampBoardPanelWidth(startWidth + (startX - ev.clientX), document.documentElement.clientWidth);
-      setBoardPanelWidth(latest);
+      if (!frame) {
+        frame = window.requestAnimationFrame(paint);
+      }
     };
     const up = () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+        frame = 0;
+      }
       document.body.style.cursor = previousCursor;
-      setBoardPanelResizing(false);
+      if (handleLine) {
+        handleLine.style.backgroundColor = "";
+      }
+      if (aside) {
+        aside.style.removeProperty("--board-w");
+        aside.style.removeProperty("--board-inner-w");
+        aside.style.marginLeft = "";
+      }
+      if (latest !== startWidth) {
+        setBoardPanelWidth(latest);
+      }
       try {
         window.localStorage.setItem(BOARD_PANEL_WIDTH_STORAGE_KEY, String(latest));
       } catch {
@@ -5090,7 +5124,7 @@ export function ReferencePrototypePage() {
 
         {/* select-none: 캔버스 여백에서 끌기 시작하면 브라우저가 카드 이미지를 파랗게 '텍스트 선택'하는 것을 막는다(텍스트 편집은 textarea라 영향 없음). */}
         {boardOpen && (
-          <aside className={`sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
+          <aside ref={boardAsideRef} className={`sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
             {indexTabsHost === "board" ? (
               // 화면 기준 top 12.5rem = 캔버스 패널(top 8.25rem) 안에서 4.25rem 아래.
               <nav aria-label="프로젝트와 캔버스" className={`${indexTabsEdgeClass} top-[4.25rem] z-20`}>
@@ -5106,9 +5140,7 @@ export function ReferencePrototypePage() {
               className="group absolute -left-[5px] top-0 z-10 h-full w-[10px] cursor-col-resize"
             >
               <div
-                className={`mx-auto h-full w-[2px] transition-colors ${
-                  boardPanelResizing ? "bg-[#222222]" : "bg-transparent group-hover:bg-[#BDBDBD]"
-                }`}
+                className="mx-auto h-full w-[2px] bg-transparent transition-colors group-hover:bg-[#BDBDBD]"
               />
             </div>
             <div className="flex h-full min-h-0 flex-col overflow-hidden border-l border-[#E5E5E5] bg-white">
