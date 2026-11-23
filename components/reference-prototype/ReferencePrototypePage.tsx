@@ -1419,6 +1419,20 @@ type TextDetailState = {
   loading: boolean;
 };
 
+/** 브라우저 방문 기록 한 칸에 담는 화면 상태 */
+type ExploreHistoryView = {
+  selectedId: string;
+  textLabel: string | null;
+  textCategory: ExploreTextEntry["category"] | null;
+  search: string;
+  filter: "all" | "image" | "text";
+  badgeFilterTag: string | null;
+  activeTag: string;
+};
+
+// 검색어를 이어서 고치는 동안(이 시간 안의 연속 변경)은 방문 기록을 한 칸으로 합친다.
+const HISTORY_SEARCH_MERGE_MS = 1500;
+
 type ExploreNavSnapshot = {
   selectedId: string;
   textDetail: TextDetailState | null;
@@ -1910,6 +1924,92 @@ export function ReferencePrototypePage() {
 
     scrollToExploreTop();
   }, [clearExploreDetail, fetchTextDetail, scrollToExploreTop]);
+
+  // ── 브라우저 뒤로가기/앞으로가기 ──
+  // 화면(선택한 레퍼런스·텍스트 상세·검색어·필터)이 바뀔 때마다 주소는 그대로 둔 채 방문 기록을 한 칸 쌓고,
+  // 브라우저 뒤로가기(popstate)를 누르면 그때 화면으로 되돌린다. 페이지 안에 별도 뒤로가기 버튼은 두지 않는다.
+  const historyRestoringRef = useRef(false);
+  const historyLastKeyRef = useRef<string | null>(null);
+  const historyLastSearchPushAtRef = useRef(0);
+  const historyView: ExploreHistoryView = {
+    selectedId,
+    textLabel: textDetail?.label ?? null,
+    textCategory: textDetail?.category ?? null,
+    search: debouncedSearch,
+    filter,
+    badgeFilterTag,
+    activeTag,
+  };
+  const historyViewKey = JSON.stringify(historyView);
+
+  useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+    const view = JSON.parse(historyViewKey) as ExploreHistoryView;
+    const state = { ...(window.history.state ?? {}), ideaveView: view };
+    if (historyLastKeyRef.current === null || historyRestoringRef.current) {
+      // 첫 화면이거나 뒤로가기로 되돌아온 화면: 기록을 새로 쌓지 않고 현재 칸만 맞춘다.
+      historyRestoringRef.current = false;
+      historyLastKeyRef.current = historyViewKey;
+      window.history.replaceState(state, "", window.location.href);
+      return;
+    }
+    if (historyLastKeyRef.current === historyViewKey) {
+      return;
+    }
+    const previous = JSON.parse(historyLastKeyRef.current) as ExploreHistoryView;
+    historyLastKeyRef.current = historyViewKey;
+    // 검색어만 이어서 바뀌는 중(타이핑)이면 칸을 새로 쌓지 않고 마지막 검색 칸을 고친다.
+    const onlySearchChanged =
+      previous.selectedId === view.selectedId &&
+      previous.textLabel === view.textLabel &&
+      previous.filter === view.filter &&
+      previous.badgeFilterTag === view.badgeFilterTag &&
+      previous.activeTag === view.activeTag &&
+      previous.search !== view.search;
+    const now = Date.now();
+    if (onlySearchChanged && previous.search && now - historyLastSearchPushAtRef.current < HISTORY_SEARCH_MERGE_MS) {
+      historyLastSearchPushAtRef.current = now;
+      window.history.replaceState(state, "", window.location.href);
+      return;
+    }
+    if (onlySearchChanged) {
+      historyLastSearchPushAtRef.current = now;
+    }
+    window.history.pushState(state, "", window.location.href);
+  }, [historyViewKey, sessionReady]);
+
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      const view = (event.state as { ideaveView?: ExploreHistoryView } | null)?.ideaveView;
+      if (!view) {
+        return;
+      }
+      historyRestoringRef.current = true;
+      exploreNavStackRef.current = [];
+      setSearchSuggestionsOpen(false);
+      setFilter(view.filter);
+      setBadgeFilterTag(view.badgeFilterTag);
+      setActiveTag(view.activeTag);
+      setQuery(view.search);
+      setDebouncedSearch(view.search);
+      setProjectDiscoverQuery(null);
+      setSelectedId(view.selectedId);
+      setSimilarBelow({ forId: null, loading: false, items: [] });
+      if (view.textLabel) {
+        const category = view.textCategory ?? undefined;
+        setTextRelated({ forLabel: view.textLabel, loading: true, images: [] });
+        void fetchTextDetail(view.textLabel, category);
+      } else {
+        setTextDetail(null);
+        setTextRelated({ forLabel: null, loading: false, images: [] });
+      }
+      scrollToExploreTop();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [fetchTextDetail, scrollToExploreTop]);
 
   const recordBrowseTerm = useCallback((raw: string) => {
     const next = raw.trim().replace(/^#/, "");
