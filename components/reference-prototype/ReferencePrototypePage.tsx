@@ -1102,7 +1102,8 @@ const FORUS_SESSION_KEY = "forus.session";
 const FORUS_BROWSE_KEY = "forus.browse";
 const FORUS_HOME_SHUFFLE_KEY = "forus.homeShuffle";
 // v3: 비전 필드(vision)가 추가돼, 예전 세션 캐시(필드 없음)는 버리고 다시 받는다.
-const FORUS_DRIVE_CATALOG_KEY = "ideave.driveCatalog.v3";
+// v4: 이미지 설명(description)을 명사형으로 다시 써서, 예전 설명이 담긴 탭 캐시를 버린다.
+const FORUS_DRIVE_CATALOG_KEY = "ideave.driveCatalog.v4";
 
 function readSessionItem(key: string): string | null {
   try {

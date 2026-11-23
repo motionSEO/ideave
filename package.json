@@ -10,7 +10,8 @@
     "build:html": "node scripts/build-html.mjs",
     "drive:test": "tsx scripts/test-google-drive.ts",
     "drive:metadata": "tsx scripts/sync-drive-metadata.ts",
-    "drive:vision": "tsx scripts/analyze-drive-vision.ts"
+    "drive:vision": "tsx scripts/analyze-drive-vision.ts",
+    "drive:rewrite-descriptions": "tsx scripts/rewrite-drive-descriptions.ts"
   },
   "dependencies": {
     "googleapis": "^182.0.0",

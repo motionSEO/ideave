@@ -14,6 +14,16 @@ export type DriveVisionAnalyzeInput = {
 const VISION_MODEL = "gemini-2.5-flash-lite";
 const VISION_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${VISION_MODEL}:generateContent`;
 
+/**
+ * 상세 화면 제목으로 쓰는 설명 문장 규칙. 번역투 대신 디자이너가 메모하듯 명사로 끝나는 짧은 구로 쓴다.
+ * 설명 다시 쓰기 스크립트(scripts/rewrite-drive-descriptions.ts)도 같은 규칙을 쓴다.
+ */
+export const DESCRIPTION_STYLE_RULE = [
+  "이 레퍼런스의 시각적 특징과 주제를 담은 한 줄(40자 안팎). 명사로 끝나는 구로 쓰세요(예: '초현실적 공간에 풍경과 오브제를 놓은 회화', '크롬 질감 3D 레터링의 Y2K 포스터').",
+  "'~입니다', '~합니다', '~자아냅니다', '~돋보입니다', '~을 특징으로 하는', '~에 의해' 같은 서술형·번역투 표현은 쓰지 마세요. 마침표도 찍지 마세요.",
+  "한국어로 옮기면 어색한 디자인 용어(예: halftone, chrome, Y2K, risograph, glitch, bokeh)는 영어 그대로 쓰세요.",
+].join(" ");
+
 // 관련 추천(referenceKeywords COLOR_FAMILIES / MOOD_FAMILIES)이 영어 기본어로 매칭하므로 color·mood는 영어로 받는다.
 // style·designKeywords·visualElements는 화면에 해시태그로 보이므로 한국어 디자인 용어로 받는다.
 const VISION_PROMPT = [
@@ -27,7 +37,7 @@ const VISION_PROMPT = [
   "- visualElements: 눈에 띄는 시각 요소·기법 3~5개. 한국어. 예: 하프톤, 그레인, 그라디언트, 글라스모피즘, 크롬 메탈, 대담한 산세리프, 손글씨 레터링, 기하학 도형, 콜라주, 강한 명암 대비",
   "- designKeywords: 이 레퍼런스를 찾을 때 쓸 구체적인 디자인 검색어 4~6개. 한국어. 매체를 알 수 있으면 '타이포 포스터', '패션 에디토리얼', '유화 정물화', '앨범 커버', '건축 사진'처럼 매체를 붙여 쓰세요.",
   "- subject: 무엇이 그려져 있는지 1~3개. 한국어.",
-  "- description: 한국어 한 문장 요약(60자 이내).",
+  `- description: ${DESCRIPTION_STYLE_RULE}`,
   "",
   "금지: 질감, 색감, 구도, 포스터, 패션, 인물, 예술, 텍스처, 이미지, 디자인 같은 한 단어 카테고리는 단독으로 쓰지 마세요.",
 ].join("\n");
