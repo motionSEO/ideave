@@ -32,6 +32,15 @@ import {
 } from "@/components/reference-prototype/boardTextSize";
 import { applyBoardResize, type ResizeEdge } from "@/components/reference-prototype/boardResize";
 import { CloseButton } from "@/components/reference-prototype/CloseIcon";
+import { BoardStrokeLayer, PenIcon, PenSettingsPopover } from "@/components/reference-prototype/BoardPenTool";
+import {
+  DEFAULT_BOARD_PEN,
+  isBoardStroke,
+  strokePathD,
+  dashPattern,
+  type BoardPenSettings,
+  type BoardStroke,
+} from "@/components/reference-prototype/boardPen";
 import { CreateModal } from "@/components/reference-prototype/CreateModal";
 import { ProjectRegisterModal } from "@/components/reference-prototype/ProjectRegisterModal";
 import { ExploreReferenceGrid } from "@/components/reference-prototype/ExploreReferenceGrid";
@@ -1098,6 +1107,8 @@ const BOARD_TEXT_GENERIC_LABELS = new Set(["", BOARD_TEXT_PLACEHOLDER, "키워�
 const FORUS_PROJECT_KEY = "forus.project";
 const FORUS_MEMO_KEY = "forus.memo";
 const FORUS_BOARD_KEY = "forus.board";
+// 캔버스 펜 획(카드와 따로 저장)
+const FORUS_BOARD_STROKES_KEY = "forus.boardStrokes";
 const FORUS_SESSION_KEY = "forus.session";
 const FORUS_BROWSE_KEY = "forus.browse";
 const FORUS_HOME_SHUFFLE_KEY = "forus.homeShuffle";
@@ -1554,6 +1565,15 @@ export function ReferencePrototypePage() {
   const boardKeywordFetchGenRef = useRef(0);
   const boardKeywordExtractKeyRef = useRef("");
   const boardItemsRef = useRef<BoardCanvasItem[]>([]);
+  // ── 펜 툴 ──
+  const [boardStrokes, setBoardStrokes] = useState<BoardStroke[]>([]);
+  const [boardPenMode, setBoardPenMode] = useState(false);
+  const [boardPenPopoverOpen, setBoardPenPopoverOpen] = useState(false);
+  const [boardPen, setBoardPen] = useState<BoardPenSettings>(DEFAULT_BOARD_PEN);
+  const boardPenModeRef = useRef(false);
+  const boardStrokesRef = useRef<BoardStroke[]>([]);
+  const boardLivePathRef = useRef<SVGPathElement | null>(null);
+  const boardStrokeSeqRef = useRef(0);
   /** Ctrl+C로 복사한 캔버스 카드(앱 내부 클립보드) */
   const boardClipboardRef = useRef<BoardCanvasItem[]>([]);
   const boardPasteCountRef = useRef(0);
@@ -3086,6 +3106,19 @@ export function ReferencePrototypePage() {
     clearLegacyLocalStorage();
     const savedMemo = readSessionItem(FORUS_MEMO_KEY);
     const savedBoard = readSessionItem(FORUS_BOARD_KEY);
+    const savedStrokes = readSessionItem(FORUS_BOARD_STROKES_KEY);
+    if (savedStrokes) {
+      try {
+        const parsed = JSON.parse(savedStrokes) as unknown;
+        if (Array.isArray(parsed)) {
+          const strokes = parsed.filter(isBoardStroke);
+          setBoardStrokes(strokes);
+          boardStrokeSeqRef.current = strokes.length;
+        }
+      } catch {
+        // 깨진 저장값은 버린다
+      }
+    }
     const savedProject = readSessionItem(FORUS_PROJECT_KEY);
     const savedSession = readSessionItem(FORUS_SESSION_KEY);
     const savedBrowse = readSessionItem(FORUS_BROWSE_KEY);
@@ -3395,6 +3428,25 @@ export function ReferencePrototypePage() {
     }, 400);
     return () => window.clearTimeout(timer);
   }, [boardItems, sessionReady]);
+
+  useEffect(() => {
+    boardStrokesRef.current = boardStrokes;
+    if (!sessionReady) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (boardStrokes.length === 0) {
+        removeSessionItem(FORUS_BOARD_STROKES_KEY);
+      } else {
+        writeSessionItem(FORUS_BOARD_STROKES_KEY, JSON.stringify(boardStrokes));
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [boardStrokes, sessionReady]);
+
+  useEffect(() => {
+    boardPenModeRef.current = boardPenMode;
+  }, [boardPenMode]);
 
   useEffect(() => {
     if (!sessionReady) {
@@ -4126,6 +4178,8 @@ export function ReferencePrototypePage() {
 
   const clearBoardItems = () => {
     setBoardItems([]);
+    setBoardStrokes([]);
+    removeSessionItem(FORUS_BOARD_STROKES_KEY);
     boardStackOffsetRef.current = 0;
     setBoardSelectedIds(new Set());
     paintBoardRubber(null);
@@ -4138,12 +4192,12 @@ export function ReferencePrototypePage() {
   };
 
   const handleBoardExport = async (format: CanvasExportFormat) => {
-    if (boardItems.length === 0 || boardExporting) {
+    if ((boardItems.length === 0 && boardStrokes.length === 0) || boardExporting) {
       return;
     }
     setBoardExporting(true);
     try {
-      await exportBoardCanvas(boardItems, format);
+      await exportBoardCanvas(boardItems, format, boardStrokes);
       setBoardExportOpen(false);
     } catch (error) {
       console.error("[IDEAVE] Canvas export failed", error);
@@ -4321,6 +4375,13 @@ export function ReferencePrototypePage() {
           return;
         }
 
+        // 펜을 쓰는 중이면 실행 취소는 마지막 획부터 지운다.
+        if (boardPenModeRef.current && boardStrokesRef.current.length > 0) {
+          e.preventDefault();
+          setBoardStrokes((prev) => prev.slice(0, -1));
+          return;
+        }
+
         const previous = boardHistoryRef.current.pop();
         if (!previous) {
           return;
@@ -4333,6 +4394,12 @@ export function ReferencePrototypePage() {
       }
 
       if (e.key !== "Escape") {
+        return;
+      }
+
+      if (boardPenModeRef.current) {
+        setBoardPenMode(false);
+        setBoardPenPopoverOpen(false);
         return;
       }
 
@@ -4618,6 +4685,83 @@ export function ReferencePrototypePage() {
       window.cancelAnimationFrame(zoomAnim.frame);
     };
   }, [boardOpen, panBoardBy, zoomBoardAtClient]);
+
+  // 펜 모드: 캔버스 위 투명 막에서 누른 채 끌면 획을 그린다. 그리는 동안은 SVG 경로만 직접 바꾸고, 손을 떼면 한 번 저장한다.
+  const startBoardPenStroke = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button === 1 || (event.button === 0 && boardSpacePressedRef.current)) {
+      startBoardPan(event);
+      return;
+    }
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    setBoardPenPopoverOpen(false);
+    const el = boardCanvasRef.current;
+    const live = boardLivePathRef.current;
+    if (!el) {
+      return;
+    }
+    const pen = boardPen;
+    const toWorld = (clientX: number, clientY: number): [number, number] => {
+      const pan = boardViewPanRef.current;
+      const point = clientToBoardPoint(clientX, clientY, el, pan.x, pan.y, boardViewScaleRef.current);
+      return [Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10];
+    };
+    const points: Array<[number, number]> = [toWorld(event.clientX, event.clientY)];
+    if (live) {
+      // 그리는 중 미리보기: 종류와 상관없이 같은 색·굵기 선(점선은 점선으로)
+      live.style.display = "";
+      live.setAttribute("stroke", pen.color);
+      live.setAttribute("stroke-width", String(pen.type === "fountain" ? Math.max(2, pen.size * 0.9) : pen.size));
+      live.setAttribute("stroke-opacity", pen.type === "pencil" ? "0.75" : "1");
+      if (pen.type === "dash") {
+        live.setAttribute("stroke-dasharray", dashPattern(pen.size).join(" "));
+      } else {
+        live.removeAttribute("stroke-dasharray");
+      }
+      live.setAttribute("d", strokePathD(points));
+    }
+    let frame = 0;
+    const move = (ev: MouseEvent) => {
+      const next = toWorld(ev.clientX, ev.clientY);
+      const last = points[points.length - 1]!;
+      // 너무 촘촘한 점은 건너뛴다(저장 크기·그리기 비용 절약).
+      if (Math.hypot(next[0] - last[0], next[1] - last[1]) < 1.5) {
+        return;
+      }
+      points.push(next);
+      if (!frame) {
+        frame = window.requestAnimationFrame(() => {
+          frame = 0;
+          live?.setAttribute("d", strokePathD(points));
+        });
+      }
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+      if (live) {
+        live.style.display = "none";
+        live.setAttribute("d", "");
+      }
+      boardStrokeSeqRef.current += 1;
+      const stroke: BoardStroke = {
+        id: `stroke-${Date.now().toString(36)}-${boardStrokeSeqRef.current}`,
+        type: pen.type,
+        color: pen.color,
+        size: pen.size,
+        points,
+      };
+      setBoardStrokes((prev) => [...prev, stroke]);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
 
   const onBoardSurfaceMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
@@ -5271,6 +5415,14 @@ export function ReferencePrototypePage() {
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={onDropToBoard}
                   onMouseDown={onBoardSurfaceMouseDown}
+                  // overflow-hidden 상자도 포커스 이동·찾기 등으로 내부가 스크롤될 수 있어, 그러면 하단 바·펜 설정 창이 엉뚱한 곳으로 밀린다.
+                  onScroll={(event) => {
+                    const box = event.currentTarget;
+                    if (box.scrollTop !== 0 || box.scrollLeft !== 0) {
+                      box.scrollTop = 0;
+                      box.scrollLeft = 0;
+                    }
+                  }}
                   className="relative min-h-0 w-[var(--board-inner-w)] max-w-full flex-1 self-center overflow-hidden rounded-[8px] border-2 border-[#E5E5E5] bg-white"
                   style={{ touchAction: "none" }}
                 >
@@ -5302,6 +5454,12 @@ export function ReferencePrototypePage() {
                     aria-hidden
                     className="pointer-events-none absolute z-[5] rounded bg-[rgba(245,245,61,0.40)]"
                     style={{ display: "none", left: 0, top: 0, width: 0, height: 0 }}
+                  />
+                  <BoardStrokeLayer
+                    strokes={boardStrokes}
+                    width={CANVAS_WIDTH}
+                    height={CANVAS_HEIGHT}
+                    livePathRef={boardLivePathRef}
                   />
                   {boardShowBubble && boardSelectionBounds ? (
                     <div
@@ -5357,6 +5515,23 @@ export function ReferencePrototypePage() {
                   )}
                   </div>
 
+                  {boardPenMode ? (
+                    // 펜을 켠 동안 카드 위에서도 그릴 수 있도록 캔버스 전체를 덮는 투명 막(하단 바·펜 설정 창은 그 위)
+                    <div
+                      aria-hidden
+                      onMouseDown={startBoardPenStroke}
+                      className="absolute inset-0 z-30 cursor-crosshair"
+                    />
+                  ) : null}
+                  {boardPenMode && boardPenPopoverOpen ? (
+                    <PenSettingsPopover
+                      settings={boardPen}
+                      onChange={setBoardPen}
+                      onClose={() => setBoardPenPopoverOpen(false)}
+                      style={{ right: 138, bottom: 70 }}
+                    />
+                  ) : null}
+
                   {/* 캔버스를 좁히면 버튼이 테두리 밖으로 나가지 않고 테두리 안에서 가로 스크롤된다. */}
                   <div
                     data-board-chrome
@@ -5381,6 +5556,31 @@ export function ReferencePrototypePage() {
                       {boardKeywordLoading ? "공통 키워드 추출중···" : "공통 키워드 추출하기"}
                     </button>
                     <div className="flex h-8 shrink-0 items-center gap-3">
+                        {/* 펜: 끄기 → 켜기+설정 열기 / 켠 상태에서 설정이 닫혀 있으면 열기 / 열려 있으면 펜 끄기 */}
+                        <button
+                          type="button"
+                          data-pen-toggle
+                          onClick={() => {
+                            if (!boardPenMode) {
+                              setBoardPenMode(true);
+                              setBoardPenPopoverOpen(true);
+                              setBoardSelectedIds(new Set());
+                              return;
+                            }
+                            if (!boardPenPopoverOpen) {
+                              setBoardPenPopoverOpen(true);
+                              return;
+                            }
+                            setBoardPenMode(false);
+                            setBoardPenPopoverOpen(false);
+                          }}
+                          aria-pressed={boardPenMode}
+                          aria-label="펜"
+                          title="펜 (Esc로 끄기)"
+                          className="flex h-8 w-8 items-center justify-center p-0 transition-opacity hover:opacity-80"
+                        >
+                          <PenIcon active={boardPenMode} color={boardPen.color} />
+                        </button>
                         <button
                           type="button"
                           onClick={addCustomTextToBoard}
@@ -5392,7 +5592,7 @@ export function ReferencePrototypePage() {
                         <button
                           type="button"
                           onClick={() => setBoardExportOpen(true)}
-                          disabled={boardItems.length === 0}
+                          disabled={boardItems.length === 0 && boardStrokes.length === 0}
                           className="flex h-8 w-8 items-center justify-center p-0 transition-opacity hover:opacity-70 disabled:opacity-30"
                           aria-label="캔버스 저장"
                         >
@@ -5401,12 +5601,12 @@ export function ReferencePrototypePage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (boardItems.length === 0) {
+                            if (boardItems.length === 0 && boardStrokes.length === 0) {
                               return;
                             }
                             setBoardClearConfirmOpen(true);
                           }}
-                          disabled={boardItems.length === 0}
+                          disabled={boardItems.length === 0 && boardStrokes.length === 0}
                           className="flex h-8 w-8 items-center justify-center p-0 transition-opacity hover:opacity-70 disabled:opacity-30"
                           aria-label="캔버스 비우기"
                         >

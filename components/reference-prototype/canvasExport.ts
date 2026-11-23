@@ -1,4 +1,11 @@
 import type { BoardCanvasItem } from "@/components/reference-prototype/BoardCanvasCard";
+import {
+  PENCIL_FILTER_SVG,
+  drawStrokeOnCanvas,
+  strokeBounds,
+  strokeToSvgMarkup,
+  type BoardStroke,
+} from "@/components/reference-prototype/boardPen";
 
 export type CanvasExportFormat = "png" | "jpg" | "webp" | "svg" | "pdf";
 
@@ -24,13 +31,13 @@ function escapeXml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function contentBounds(items: BoardCanvasItem[]): {
+function contentBounds(items: BoardCanvasItem[], strokes: BoardStroke[] = []): {
   x: number;
   y: number;
   width: number;
   height: number;
 } | null {
-  if (items.length === 0) {
+  if (items.length === 0 && strokes.length === 0) {
     return null;
   }
   let minX = Number.POSITIVE_INFINITY;
@@ -42,6 +49,13 @@ function contentBounds(items: BoardCanvasItem[]): {
     minY = Math.min(minY, item.y);
     maxX = Math.max(maxX, item.x + item.width);
     maxY = Math.max(maxY, item.y + item.height);
+  }
+  for (const stroke of strokes) {
+    const b = strokeBounds(stroke);
+    minX = Math.min(minX, b.minX);
+    minY = Math.min(minY, b.minY);
+    maxX = Math.max(maxX, b.maxX);
+    maxY = Math.max(maxY, b.maxY);
   }
   const x = Math.max(0, Math.floor(minX - FRAME_PAD));
   const y = Math.max(0, Math.floor(minY - FRAME_PAD));
@@ -87,8 +101,8 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines.length > 0 ? lines : [""];
 }
 
-async function drawBoardToCanvas(items: BoardCanvasItem[]): Promise<HTMLCanvasElement> {
-  const bounds = contentBounds(items);
+async function drawBoardToCanvas(items: BoardCanvasItem[], strokes: BoardStroke[]): Promise<HTMLCanvasElement> {
+  const bounds = contentBounds(items, strokes);
   if (!bounds) {
     throw new Error("empty");
   }
@@ -143,11 +157,16 @@ async function drawBoardToCanvas(items: BoardCanvasItem[]): Promise<HTMLCanvasEl
     }
   }
 
+  // 펜 획은 화면처럼 카드 위에 그린다.
+  for (const stroke of strokes) {
+    drawStrokeOnCanvas(ctx, stroke, bounds.x, bounds.y);
+  }
+
   return canvas;
 }
 
-function buildSvg(items: BoardCanvasItem[]): string {
-  const bounds = contentBounds(items);
+function buildSvg(items: BoardCanvasItem[], strokes: BoardStroke[]): string {
+  const bounds = contentBounds(items, strokes);
   if (!bounds) {
     return "";
   }
@@ -178,7 +197,10 @@ function buildSvg(items: BoardCanvasItem[]): string {
       `<foreignObject x="${x + 8}" y="${y + 8}" width="${Math.max(1, item.width - 16)}" height="${Math.max(1, item.height - 16)}"><div xmlns="http://www.w3.org/1999/xhtml" style="font:500 ${fontSize}px Pretendard,sans-serif;color:#222;white-space:pre-wrap;word-break:keep-all;">${escapeXml(item.text ?? "")}</div></foreignObject>`,
     );
   }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${bounds.width}" height="${bounds.height}" viewBox="0 0 ${bounds.width} ${bounds.height}">${nodes.join("")}</svg>`;
+  for (const stroke of strokes) {
+    nodes.push(strokeToSvgMarkup(stroke, bounds.x, bounds.y));
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${bounds.width}" height="${bounds.height}" viewBox="0 0 ${bounds.width} ${bounds.height}"><defs>${PENCIL_FILTER_SVG}</defs>${nodes.join("")}</svg>`;
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
@@ -253,20 +275,21 @@ function triggerDownload(blob: Blob, filename: string) {
 export async function exportBoardCanvas(
   items: BoardCanvasItem[],
   format: CanvasExportFormat,
+  strokes: BoardStroke[] = [],
 ): Promise<void> {
-  if (items.length === 0) {
+  if (items.length === 0 && strokes.length === 0) {
     return;
   }
   const stamp = new Date().toISOString().slice(0, 10);
   const base = `ideave-canvas-${stamp}`;
 
   if (format === "svg") {
-    const svg = buildSvg(items);
+    const svg = buildSvg(items, strokes);
     triggerDownload(new Blob([svg], { type: "image/svg+xml" }), `${base}.svg`);
     return;
   }
 
-  const canvas = await drawBoardToCanvas(items);
+  const canvas = await drawBoardToCanvas(items, strokes);
   if (format === "pdf") {
     const jpegBlob = await canvasToBlob(canvas, "image/jpeg", 0.92);
     const jpeg = new Uint8Array(await jpegBlob.arrayBuffer());
