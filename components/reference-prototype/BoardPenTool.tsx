@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import {
   BOARD_PEN_PRESET_COLORS,
   BOARD_PEN_SIZES,
@@ -8,6 +8,7 @@ import {
   PENCIL_FILTER_SVG,
   hexToHsv,
   hsvToHex,
+  strokePathD,
   strokeToSvgMarkup,
   type BoardPenSettings,
   type BoardPenType,
@@ -15,6 +16,9 @@ import {
 } from "@/components/reference-prototype/boardPen";
 
 const SAFE_HEX = /^#[0-9a-f]{6}$/i;
+// 펜 설정 창 기본 너비와, 캔버스 가장자리와 띄울 최소 간격
+const POPOVER_WIDTH = 276;
+const POPOVER_EDGE_GAP = 8;
 
 /** 저장된 획을 다시 그릴 때 색 값이 #RRGGBB가 아니면 기본 검정으로(세션 저장값을 그대로 마크업에 넣으므로). */
 function safeStroke(stroke: BoardStroke): BoardStroke {
@@ -24,16 +28,27 @@ function safeStroke(stroke: BoardStroke): BoardStroke {
 /** 캔버스 월드 위에 얹는 획 레이어. 그리는 중인 획은 livePathRef에 직접 그려 React 재렌더 없이 따라간다. */
 export function BoardStrokeLayer({
   strokes,
+  selectedIds,
   width,
   height,
   livePathRef,
 }: {
   strokes: BoardStroke[];
+  /** 선택된 획: 다른 카드처럼 라임으로 감싸 보여 준다 */
+  selectedIds: Set<string>;
   width: number;
   height: number;
   livePathRef: RefObject<SVGPathElement | null>;
 }) {
   const markup = strokes.map((stroke) => strokeToSvgMarkup(safeStroke(stroke), 0, 0)).join("");
+  // 선택 표시: 획 뒤에 굵은 라임 선을 깔아 형광펜처럼 감싼다.
+  const halo = strokes
+    .filter((stroke) => selectedIds.has(stroke.id))
+    .map(
+      (stroke) =>
+        `<path d="${strokePathD(stroke.points)}" fill="none" stroke="#F5F53D" stroke-opacity="0.9" stroke-width="${stroke.size + 10}" stroke-linecap="round" stroke-linejoin="round"/>`,
+    )
+    .join("");
   return (
     <svg
       aria-hidden
@@ -43,6 +58,7 @@ export function BoardStrokeLayer({
       viewBox={`0 0 ${width} ${height}`}
     >
       <defs dangerouslySetInnerHTML={{ __html: PENCIL_FILTER_SVG }} />
+      <g dangerouslySetInnerHTML={{ __html: halo }} />
       <g dangerouslySetInnerHTML={{ __html: markup }} />
       <path ref={livePathRef} fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ display: "none" }} />
     </svg>
@@ -102,14 +118,63 @@ export function PenSettingsPopover({
   settings,
   onChange,
   onClose,
-  style,
+  anchorRef,
+  boundsRef,
 }: {
   settings: BoardPenSettings;
   onChange: (next: BoardPenSettings) => void;
   onClose: () => void;
-  style?: React.CSSProperties;
+  /** 펜 아이콘 버튼: 창의 말꼬리가 가리킬 곳 */
+  anchorRef: RefObject<HTMLElement | null>;
+  /** 캔버스 상자: 창이 이 안에서 잘리지 않게 위치·너비·높이를 맞춘다 */
+  boundsRef: RefObject<HTMLElement | null>;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [layout, setLayout] = useState<{
+    left: number;
+    bottom: number;
+    width: number;
+    arrowLeft: number;
+    maxHeight: number;
+  } | null>(null);
+
+  // 캔버스 너비를 줄이거나 하단 바가 가로로 스크롤돼도 창이 캔버스 안에 들어오고 말꼬리는 펜 아이콘을 가리키게 한다.
+  useLayoutEffect(() => {
+    const bounds = boundsRef.current;
+    const anchor = anchorRef.current;
+    if (!bounds || !anchor) {
+      return;
+    }
+    const measure = () => {
+      const box = bounds.getBoundingClientRect();
+      const a = anchor.getBoundingClientRect();
+      const width = Math.min(POPOVER_WIDTH, box.width - POPOVER_EDGE_GAP * 2);
+      const anchorX = a.left + a.width / 2 - box.left;
+      // 기본은 말꼬리가 창 오른쪽에서 36px 들어간 자리(펜 아이콘 위). 캔버스 밖으로 나가면 안쪽으로 민다.
+      const preferredLeft = anchorX - (width - 36);
+      const left = Math.max(POPOVER_EDGE_GAP, Math.min(preferredLeft, box.width - width - POPOVER_EDGE_GAP));
+      const arrowLeft = Math.max(14, Math.min(anchorX - left - 6, width - 26));
+      const anchorTop = a.top - box.top;
+      setLayout({
+        left,
+        width,
+        arrowLeft,
+        bottom: box.height - anchorTop + 12,
+        maxHeight: Math.max(160, anchorTop - 12 - POPOVER_EDGE_GAP),
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bounds);
+    const toolbar = anchor.closest("[data-board-toolbar]");
+    toolbar?.addEventListener("scroll", measure);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      toolbar?.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, [anchorRef, boundsRef]);
   const [typeOpen, setTypeOpen] = useState(false);
   const [hsv, setHsv] = useState(() => hexToHsv(settings.color) ?? { h: 0, s: 0, v: 0.13 });
   const [hexDraft, setHexDraft] = useState(settings.color);
@@ -184,11 +249,24 @@ export function PenSettingsPopover({
       role="dialog"
       aria-label="펜 설정"
       onMouseDown={(event) => event.stopPropagation()}
-      className="absolute z-50 flex w-[276px] select-none flex-col gap-2.5 rounded-[10px] bg-white p-4 shadow-[0_12px_32px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.06)]"
-      style={style}
+      className="absolute z-50 flex select-none flex-col rounded-[10px] bg-white shadow-[0_12px_32px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.06)]"
+      style={
+        layout
+          ? { left: layout.left, bottom: layout.bottom, width: layout.width }
+          : { right: 138, bottom: 70, width: POPOVER_WIDTH, visibility: "hidden" }
+      }
     >
       {/* 말꼬리: 펜 아이콘을 가리킨다 */}
-      <span aria-hidden className="absolute -bottom-[6px] right-[30px] h-3 w-3 rotate-45 bg-white" />
+      <span
+        aria-hidden
+        className="absolute -bottom-[6px] h-3 w-3 rotate-45 bg-white"
+        style={{ left: layout?.arrowLeft ?? POPOVER_WIDTH - 36 }}
+      />
+      {/* 캔버스가 낮으면 창 안쪽만 세로로 스크롤된다 */}
+      <div
+        className="flex min-h-0 flex-col gap-2.5 overflow-y-auto overscroll-contain p-4 [scrollbar-width:thin]"
+        style={{ maxHeight: layout?.maxHeight }}
+      >
 
       <div className="h-10 overflow-hidden rounded-[6px] bg-[#F3F3F3]">
         <svg viewBox="0 0 280 40" preserveAspectRatio="none" className="h-full w-full" aria-hidden>
@@ -326,6 +404,7 @@ export function PenSettingsPopover({
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

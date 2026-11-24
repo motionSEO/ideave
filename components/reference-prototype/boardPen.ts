@@ -143,6 +143,51 @@ export function drawStrokeOnCanvas(ctx: CanvasRenderingContext2D, stroke: BoardS
   ctx.restore();
 }
 
+/** 선분이 사각형(경계 포함)을 지나가는지: 끝점이 안에 있거나, 사각형 네 변 중 하나와 교차하면 참. */
+function segmentHitsRect(ax: number, ay: number, bx: number, by: number, x0: number, y0: number, x1: number, y1: number): boolean {
+  const inside = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  if (inside(ax, ay) || inside(bx, by)) {
+    return true;
+  }
+  const cross = (px: number, py: number, qx: number, qy: number, rx: number, ry: number, sx: number, sy: number) => {
+    const d = (qx - px) * (sy - ry) - (qy - py) * (sx - rx);
+    if (d === 0) {
+      return false;
+    }
+    const t = ((rx - px) * (sy - ry) - (ry - py) * (sx - rx)) / d;
+    const u = ((rx - px) * (qy - py) - (ry - py) * (qx - px)) / d;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  };
+  return (
+    cross(ax, ay, bx, by, x0, y0, x1, y0) ||
+    cross(ax, ay, bx, by, x1, y0, x1, y1) ||
+    cross(ax, ay, bx, by, x0, y1, x1, y1) ||
+    cross(ax, ay, bx, by, x0, y0, x0, y1)
+  );
+}
+
+/** 끌어서 만든 선택 사각형(월드 좌표)에 획의 어느 부분이라도 걸리면 선택한다(굵기만큼 여유). */
+export function strokeHitsRect(stroke: BoardStroke, x: number, y: number, w: number, h: number): boolean {
+  const pad = stroke.size / 2;
+  const x0 = x - pad;
+  const y0 = y - pad;
+  const x1 = x + w + pad;
+  const y1 = y + h + pad;
+  const pts = stroke.points;
+  if (pts.length === 1) {
+    const [px, py] = pts[0]!;
+    return px >= x0 && px <= x1 && py >= y0 && py <= y1;
+  }
+  for (let i = 1; i < pts.length; i += 1) {
+    const [ax, ay] = pts[i - 1]!;
+    const [bx, by] = pts[i]!;
+    if (segmentHitsRect(ax, ay, bx, by, x0, y0, x1, y1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function isBoardStroke(value: unknown): value is BoardStroke {
   if (!value || typeof value !== "object") {
     return false;
