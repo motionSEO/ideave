@@ -424,13 +424,19 @@ export function ReferenceCard({
   }
 
   if (item.imageUrl) {
+    // 그리드 카드는 240px라 Drive 원본(수 MB) 대신 긴 변 480px 사본을 쓰고, 화면 가까이 올 때만 불러온다.
+    const cardSrc =
+      item.imageUrl.startsWith("/api/drive/file/") && !item.imageUrl.includes("?")
+        ? `${item.imageUrl}?size=card`
+        : item.imageUrl;
     const imageFront = (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={item.imageUrl}
+          src={cardSrc}
           alt=""
           draggable={false}
+          loading="lazy"
           decoding="async"
           onError={() => {
             console.error("[IDEAVE] image load failed", item.id, item.imageUrl);

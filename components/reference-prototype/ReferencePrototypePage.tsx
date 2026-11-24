@@ -36,6 +36,7 @@ import { BoardStrokeLayer, PenIcon, PenSettingsPopover } from "@/components/refe
 import {
   DEFAULT_BOARD_PEN,
   isBoardStroke,
+  strokeHitsRect,
   strokePathD,
   dashPattern,
   type BoardPenSettings,
@@ -1573,6 +1574,10 @@ export function ReferencePrototypePage() {
   const boardPenModeRef = useRef(false);
   const boardStrokesRef = useRef<BoardStroke[]>([]);
   const boardLivePathRef = useRef<SVGPathElement | null>(null);
+  const boardPenButtonRef = useRef<HTMLButtonElement | null>(null);
+  // 끌어서 고른 펜 획(Delete로 지운다)
+  const [boardSelectedStrokeIds, setBoardSelectedStrokeIds] = useState<Set<string>>(() => new Set());
+  const boardSelectedStrokeIdsRef = useRef<Set<string>>(boardSelectedStrokeIds);
   const boardStrokeSeqRef = useRef(0);
   /** Ctrl+C로 복사한 캔버스 카드(앱 내부 클립보드) */
   const boardClipboardRef = useRef<BoardCanvasItem[]>([]);
@@ -3446,7 +3451,14 @@ export function ReferencePrototypePage() {
 
   useEffect(() => {
     boardPenModeRef.current = boardPenMode;
+    if (boardPenMode) {
+      setBoardSelectedStrokeIds(new Set());
+    }
   }, [boardPenMode]);
+
+  useEffect(() => {
+    boardSelectedStrokeIdsRef.current = boardSelectedStrokeIds;
+  }, [boardSelectedStrokeIds]);
 
   useEffect(() => {
     if (!sessionReady) {
@@ -3593,6 +3605,13 @@ export function ReferencePrototypePage() {
   const shuffledExploreTextPool = useMemo(
     () => shuffleExploreTextEntries(exploreTextPool, exploreTextShuffleKey),
     [exploreTextPool, exploreTextShuffleKey],
+  );
+
+  // 그리드(memo)가 매번 새 함수로 다시 그려지지 않도록 고정한다.
+  const getExploreGridItemKey = useCallback((item: ReferenceItem) => exploreItemKey(item, "explore"), []);
+  const renderExploreGridItem = useCallback(
+    (item: ReferenceItem) => renderReferenceGridCard(item, "explore"),
+    [renderReferenceGridCard],
   );
 
   const exploreGridItems = useMemo(
@@ -4179,6 +4198,7 @@ export function ReferencePrototypePage() {
   const clearBoardItems = () => {
     setBoardItems([]);
     setBoardStrokes([]);
+    setBoardSelectedStrokeIds(new Set());
     removeSessionItem(FORUS_BOARD_STROKES_KEY);
     boardStackOffsetRef.current = 0;
     setBoardSelectedIds(new Set());
@@ -4329,6 +4349,12 @@ export function ReferencePrototypePage() {
           return;
         }
 
+        const selectedStrokes = boardSelectedStrokeIdsRef.current;
+        if (selectedStrokes.size > 0) {
+          e.preventDefault();
+          setBoardStrokes((prev) => prev.filter((stroke) => !selectedStrokes.has(stroke.id)));
+          setBoardSelectedStrokeIds(new Set());
+        }
         if (selected.size > 0) {
           e.preventDefault();
           setBoardItems((prev) => prev.filter((item) => !selected.has(item.id)));
@@ -4404,6 +4430,7 @@ export function ReferencePrototypePage() {
       }
 
       setBoardSelectedIds(new Set());
+      setBoardSelectedStrokeIds(new Set());
       paintBoardRubber(null);
       boardBandStartRef.current = null;
       setBoardKeywords(null);
@@ -4832,6 +4859,7 @@ export function ReferencePrototypePage() {
       if (w < MIN_BOARD_BAND_PX || h < MIN_BOARD_BAND_PX) {
         if (!origin.skipDeselect) {
           setBoardSelectedIds(new Set());
+          setBoardSelectedStrokeIds(new Set());
         }
         return;
       }
@@ -4844,6 +4872,10 @@ export function ReferencePrototypePage() {
       }
 
       setBoardSelectedIds(next);
+      // 펜 획도 카드처럼 선택 사각형에 걸리면 함께 고른다.
+      setBoardSelectedStrokeIds(
+        new Set(boardStrokesRef.current.filter((stroke) => strokeHitsRect(stroke, x1, y1, w, h)).map((stroke) => stroke.id)),
+      );
     };
 
     window.addEventListener("mousemove", move);
@@ -5326,8 +5358,8 @@ export function ReferencePrototypePage() {
                   <ExploreReferenceGrid
                     items={detailGridItems}
                     columnCountOverride={gridColumnOverride}
-                    getItemKey={(item) => exploreItemKey(item, "explore")}
-                    renderItem={(item) => renderReferenceGridCard(item, "explore")}
+                    getItemKey={getExploreGridItemKey}
+                    renderItem={renderExploreGridItem}
                   />
                 </div>
               )}
@@ -5361,15 +5393,15 @@ export function ReferencePrototypePage() {
             <ExploreReferenceGrid
               items={exploreGridItems}
               columnCountOverride={gridColumnOverride}
-              getItemKey={(item) => exploreItemKey(item, "explore")}
-              renderItem={(item) => renderReferenceGridCard(item, "explore")}
+              getItemKey={getExploreGridItemKey}
+              renderItem={renderExploreGridItem}
             />
           )}
         </section>
 
         {/* select-none: 캔버스 여백에서 끌기 시작하면 브라우저가 카드 이미지를 파랗게 '텍스트 선택'하는 것을 막는다(텍스트 편집은 textarea라 영향 없음). */}
         {boardOpen && (
-          <aside ref={boardAsideRef} className={`sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
+          <aside ref={boardAsideRef} className={`sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
             {indexTabsHost === "board" ? (
               // 화면 기준 top 12.5rem = 캔버스 패널(top 8.25rem) 안에서 4.25rem 아래.
               <nav aria-label="프로젝트와 캔버스" className={`${indexTabsEdgeClass} top-[4.25rem] z-20`}>
@@ -5457,6 +5489,7 @@ export function ReferencePrototypePage() {
                   />
                   <BoardStrokeLayer
                     strokes={boardStrokes}
+                    selectedIds={boardSelectedStrokeIds}
                     width={CANVAS_WIDTH}
                     height={CANVAS_HEIGHT}
                     livePathRef={boardLivePathRef}
@@ -5528,7 +5561,8 @@ export function ReferencePrototypePage() {
                       settings={boardPen}
                       onChange={setBoardPen}
                       onClose={() => setBoardPenPopoverOpen(false)}
-                      style={{ right: 138, bottom: 70 }}
+                      anchorRef={boardPenButtonRef}
+                      boundsRef={boardCanvasRef}
                     />
                   ) : null}
 
@@ -5560,6 +5594,7 @@ export function ReferencePrototypePage() {
                         <button
                           type="button"
                           data-pen-toggle
+                          ref={boardPenButtonRef}
                           onClick={() => {
                             if (!boardPenMode) {
                               setBoardPenMode(true);

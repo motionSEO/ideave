@@ -11,6 +11,9 @@ type RouteContext = {
 };
 
 const THUMB_MAX_BYTES = 512 * 1024;
+// 그리드 카드용 중간 크기(카드 240px × 화면 배율 2). 원본(수 MB)을 수백 장 받지 않으려고 쓴다.
+const CARD_THUMB_PX = 480;
+const CARD_MAX_BYTES = 2 * 1024 * 1024;
 const DRIVE_MEDIA_TIMEOUT_MS = 20_000;
 
 /**
@@ -23,24 +26,33 @@ async function fetchDriveThumbnail(
   accessToken: string,
   fileId: string,
   snapshotLink: string | null,
+  px = 128,
+  maxBytes = THUMB_MAX_BYTES,
 ): Promise<Response | null> {
   if (snapshotLink) {
-    const cached = await fetchThumbnailFromLink(snapshotLink, accessToken);
+    const cached = await fetchThumbnailFromLink(snapshotLink, accessToken, px, maxBytes);
     if (cached) {
       return cached;
     }
   }
   try {
     const meta = await drive.files.get({ fileId, fields: "thumbnailLink", supportsAllDrives: true });
-    return meta.data.thumbnailLink ? await fetchThumbnailFromLink(meta.data.thumbnailLink, accessToken) : null;
+    return meta.data.thumbnailLink
+      ? await fetchThumbnailFromLink(meta.data.thumbnailLink, accessToken, px, maxBytes)
+      : null;
   } catch {
     return null;
   }
 }
 
-async function fetchThumbnailFromLink(link: string, accessToken: string): Promise<Response | null> {
+async function fetchThumbnailFromLink(
+  link: string,
+  accessToken: string,
+  px = 128,
+  maxBytes = THUMB_MAX_BYTES,
+): Promise<Response | null> {
   try {
-    const url = new URL(link.replace(/=s\d+(-[a-z0-9-]+)?$/i, "=s128"));
+    const url = new URL(link.replace(/=s\d+(-[a-z0-9-]+)?$/i, `=s${px}`));
     if (url.protocol !== "https:" || !url.hostname.endsWith(".googleusercontent.com")) {
       return null;
     }
@@ -54,7 +66,7 @@ async function fetchThumbnailFromLink(link: string, accessToken: string): Promis
       return null;
     }
     const bytes = await response.arrayBuffer();
-    if (bytes.byteLength === 0 || bytes.byteLength > THUMB_MAX_BYTES) {
+    if (bytes.byteLength === 0 || bytes.byteLength > maxBytes) {
       return null;
     }
     return new Response(bytes, {
@@ -67,7 +79,9 @@ async function fetchThumbnailFromLink(link: string, accessToken: string): Promis
 
 export async function GET(request: Request, context: RouteContext) {
   const { id } = await context.params;
-  const wantsThumb = new URL(request.url).searchParams.get("size") === "thumb";
+  const sizeParam = new URL(request.url).searchParams.get("size");
+  const wantsThumb = sizeParam === "thumb";
+  const wantsCard = sizeParam === "card";
   if (!isAllowedDriveFileId(id)) {
     return new Response("Invalid file id", { status: 400 });
   }
@@ -82,9 +96,13 @@ export async function GET(request: Request, context: RouteContext) {
     const auth = await authorizeDriveServer();
     const drive = google.drive({ version: "v3", auth });
 
-    if (wantsThumb) {
+    if (wantsThumb || wantsCard) {
       const token = (await auth.getAccessToken()).token;
-      const thumb = token ? await fetchDriveThumbnail(drive, token, id, record.thumbnailLink) : null;
+      const thumb = token
+        ? wantsCard
+          ? await fetchDriveThumbnail(drive, token, id, record.thumbnailLink, CARD_THUMB_PX, CARD_MAX_BYTES)
+          : await fetchDriveThumbnail(drive, token, id, record.thumbnailLink)
+        : null;
       if (thumb) {
         return thumb;
       }

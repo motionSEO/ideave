@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 
 function getColumnCount(width: number): number {
   if (width >= 1280) return 5;
@@ -25,7 +25,7 @@ type ExploreReferenceGridProps<T> = {
   columnCountOverride?: number;
 };
 
-export function ExploreReferenceGrid<T>({
+function ExploreReferenceGridInner<T>({
   items,
   getItemKey,
   renderItem,
@@ -70,3 +70,9 @@ export function ExploreReferenceGrid<T>({
     </div>
   );
 }
+
+/**
+ * 카드 목록·그리는 함수·열 수가 그대로면 다시 그리지 않는다.
+ * (캔버스에서 카드를 끌거나 펜으로 그릴 때마다 탐색 카드 수백 장이 다시 계산돼 버벅이던 문제)
+ */
+export const ExploreReferenceGrid = memo(ExploreReferenceGridInner) as typeof ExploreReferenceGridInner;
