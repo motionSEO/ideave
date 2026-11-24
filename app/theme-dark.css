@@ -1,0 +1,214 @@
+/*
+ * IDEAVE 다크 모드(K-1 차콜). <html data-theme="dark"> 일 때만 적용된다.
+ * 컴포넌트가 Tailwind 색 클래스를 직접 쓰고 있어서, 화이트용 색 클래스를 다크 색으로 덮어쓴다.
+ * 이 파일은 레이어 밖 CSS라 Tailwind 유틸리티보다 우선한다 → 필요한 hover 상태도 여기서 다시 지정한다.
+ * 라임·핑크 브랜드 색은 그대로 두고, 바탕·면·선·글자만 바꾼다. '선택됨' 검정 표시는 라임으로 바꾼다.
+ */
+
+html[data-theme="dark"] {
+  --d-bg: #141414;
+  --d-surface: #1e1e1e;
+  --d-surface2: #262626;
+  --d-surface3: #2f2f2f;
+  --d-line: #2c2c2c;
+  --d-text: #ededed;
+  --d-muted: #8c8c8c;
+  --d-header: #0b0b0b;
+  --background: var(--d-bg);
+  --foreground: var(--d-text);
+  --silver: var(--d-line);
+  --grey-H0: var(--d-surface2);
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body {
+  background: var(--d-bg);
+  color: var(--d-text);
+}
+
+/* ── 바탕·면 ── */
+html[data-theme="dark"] .bg-white {
+  background-color: var(--d-surface);
+}
+/* 상단 검색·필터 띠처럼 '#FFFFFF'로 쓴 큰 바탕은 페이지 바탕과 같은 색 */
+html[data-theme="dark"] .bg-\[\#FFFFFF\] {
+  background-color: var(--d-bg);
+}
+html[data-theme="dark"] .min-h-screen.bg-white {
+  background-color: var(--d-bg);
+}
+html[data-theme="dark"] .bg-\[\#F0F0F0\],
+html[data-theme="dark"] .bg-\[var\(--grey-H0\,\#F0F0F0\)\],
+html[data-theme="dark"] .bg-\[\#F3F3F3\],
+html[data-theme="dark"] .bg-\[\#E5E5E5\] {
+  background-color: var(--d-surface2);
+}
+/* 헤더(검정 바) */
+html[data-theme="dark"] header.bg-\[\#222222\] {
+  background-color: var(--d-header);
+}
+
+/* ── 선 ── */
+html[data-theme="dark"] .border-\[\#E5E5E5\],
+html[data-theme="dark"] .border-\[var\(--silver\,\#E5E5E5\)\],
+html[data-theme="dark"] .border-\[\#E5E7EB\] {
+  border-color: var(--d-line);
+}
+html[data-theme="dark"] .shadow-\[inset_0_0_0_1px_\#E5E7EB\] {
+  box-shadow: inset 0 0 0 1px var(--d-line);
+}
+
+/* ── 글자 ── (라임 바탕 위 글자는 어두운 색을 유지) */
+html[data-theme="dark"] .text-\[\#222222\]:not(.bg-\[\#F5F53D\]),
+html[data-theme="dark"] .text-\[\#1A1A1A\],
+html[data-theme="dark"] .text-black:not(.bg-\[\#F5F53D\]),
+html[data-theme="dark"] .text-\[\#000000\],
+html[data-theme="dark"] .text-\[\#333333\] {
+  color: var(--d-text);
+}
+html[data-theme="dark"] .text-\[\#848484\],
+html[data-theme="dark"] .text-\[var\(--hint-text-border\,\#848484\)\],
+html[data-theme="dark"] .text-\[\#9A9A9A\] {
+  color: var(--d-muted);
+}
+html[data-theme="dark"] .bg-\[\#F5F53D\],
+html[data-theme="dark"] .bg-\[\#F5F53D\] *,
+html[data-theme="dark"] .bg-\[\#F5F53D\] .text-\[\#222222\],
+html[data-theme="dark"] .bg-\[\#F5F53D\] .text-black,
+html[data-theme="dark"] .bg-\[var\(--lime-green\,\#F5F53D\)\] .text-black {
+  color: #222222;
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #6e6e6e;
+}
+
+/* ── 마우스 올림 ── */
+html[data-theme="dark"] .hover\:bg-\[\#F0F0F0\]:hover,
+html[data-theme="dark"] .hover\:bg-\[\#F3F3F3\]:hover,
+html[data-theme="dark"] .hover\:bg-\[\#E5E5E5\]:hover,
+html[data-theme="dark"] .hover\:bg-\[\#E5E7EB\]:hover,
+html[data-theme="dark"] .hover\:bg-\[color-mix\(in_srgb\,\#000000_8\%\,\#F0F0F0\)\]:hover,
+html[data-theme="dark"] .hover\:bg-\[color-mix\(in_srgb\,\#000000_20\%\,\#F0F0F0\)\]:hover {
+  background-color: var(--d-surface3);
+}
+/* 텍스트 카드·라임 버튼 hover는 라임 + 어두운 글자 유지 */
+html[data-theme="dark"] .hover\:bg-\[\#F5F53D\]:hover,
+html[data-theme="dark"] .group\/textcard:hover {
+  background-color: #f5f53d;
+}
+html[data-theme="dark"] .hover\:bg-\[\#F5F53D\]:hover *,
+html[data-theme="dark"] .group\/textcard:hover * {
+  color: #222222;
+}
+html[data-theme="dark"] .hover\:bg-\[\#222222\]:hover {
+  background-color: #f5f53d;
+  color: #222222;
+}
+
+/* ── '선택됨' 검정 표시 → 라임 ── */
+/* 전체/이미지/텍스트 필터의 고른 칸 */
+html[data-theme="dark"] nav[aria-label="레퍼런스 필터"] .bg-\[\#222222\] {
+  background-color: #f5f53d;
+  color: #222222;
+}
+/* 상세 화면 관련 키워드 칩(고른 것) */
+html[data-theme="dark"] .border-\[\#222222\].bg-\[\#222222\] {
+  background-color: #f5f53d;
+  border-color: #f5f53d;
+  color: #222222;
+}
+/* 오른쪽 프로젝트 인덱스 탭: 검정 → 밝은 회색 반전 */
+html[data-theme="dark"] [data-index-tab="dark"] {
+  background-color: var(--d-text);
+  color: var(--d-bg);
+}
+/* 하단 바 펜 아이콘(켜짐): 검정 칸 → 라임 칸 + 검정 펜 */
+html[data-theme="dark"] [data-pen-icon="on"] {
+  background-color: #f5f53d;
+}
+html[data-theme="dark"] [data-pen-icon="on"] path {
+  stroke: #222222;
+}
+html[data-theme="dark"] [data-pen-icon="off"] path {
+  stroke: var(--d-text);
+}
+/* 캔버스 하단 바의 PNG 아이콘(검정 선)은 밝게 반전 */
+html[data-theme="dark"] img[src^="/canvas-"] {
+  filter: invert(1) brightness(0.93);
+}
+
+/* ── 캔버스 ── */
+html[data-theme="dark"] [data-board-dots] {
+  background-color: var(--d-bg) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Crect width='4' height='4' fill='%232A2A2A'/%3E%3C/svg%3E") !important;
+}
+
+/* ── 그림자: 어두운 바탕에서 보이도록 진하게 ── */
+html[data-theme="dark"] .shadow-\[0_4px_10px_0_rgba\(0\,0\,0\,0\.10\)\] {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="dark"] .shadow-\[-12px_0_32px_rgba\(0\,0\,0\,0\.08\)\] {
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.5);
+}
+/* 펜 설정 창·프로필 메뉴처럼 떠 있는 창은 한 단계 밝은 면 */
+html[data-theme="dark"] [aria-label="펜 설정"],
+html[data-theme="dark"] [role="menu"] {
+  background-color: var(--d-surface2);
+}
+html[data-theme="dark"] [aria-label="펜 설정"] .bg-\[\#F3F3F3\],
+html[data-theme="dark"] [role="menu"] .hover\:bg-\[\#F3F3F3\]:hover {
+  background-color: var(--d-surface3);
+}
+html[data-theme="dark"] [aria-label="펜 설정"] > span[aria-hidden] {
+  background-color: var(--d-surface2);
+}
+
+/* 스크롤바 */
+html[data-theme="dark"] {
+  scrollbar-color: #3a3a3a transparent;
+}
+
+/* ── 아이콘·선 그림: 검정(#222222)으로 그린 아이콘은 밝게, 라임 칸 안에서는 그대로 ── */
+html[data-theme="dark"] {
+  --sds-color-icon-default-default: var(--d-text);
+}
+html[data-theme="dark"] svg [stroke="#222222"] {
+  stroke: var(--d-text);
+}
+html[data-theme="dark"] svg[fill="#222222"],
+html[data-theme="dark"] svg [fill="#222222"] {
+  fill: var(--d-text);
+}
+html[data-theme="dark"] .bg-\[\#F5F53D\] svg [stroke="#222222"],
+html[data-theme="dark"] [data-pen-icon="on"] svg [stroke] {
+  stroke: #222222;
+}
+html[data-theme="dark"] .bg-\[\#F5F53D\] svg [fill="#222222"] {
+  fill: #222222;
+}
+
+/* 펜 설정 창: 두께 점·검정 색 바로가기가 어두운 칸에 묻히지 않게 */
+html[data-theme="dark"] [aria-label="펜 설정"] i.bg-\[\#222222\] {
+  background-color: var(--d-text);
+}
+html[data-theme="dark"] [aria-label="펜 설정"] .bg-\[\#F5F53D\] i.bg-\[\#222222\] {
+  background-color: #222222;
+}
+html[data-theme="dark"] [aria-label="색 #222222"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+html[data-theme="dark"] [aria-label="펜 설정"] .outline-\[\#222222\] {
+  outline-color: var(--d-text);
+}
+
+/* 프로필 메뉴의 고르지 않은 모드 칸이 메뉴 바탕에 묻히지 않게 */
+html[data-theme="dark"] [role="menu"] .bg-\[\#F3F3F3\] {
+  background-color: var(--d-surface3);
+}
+
+/* 입력칸은 창 바탕보다 한 단계 밝게 */
+html[data-theme="dark"] input.bg-white,
+html[data-theme="dark"] textarea.bg-white {
+  background-color: var(--d-surface2);
+}

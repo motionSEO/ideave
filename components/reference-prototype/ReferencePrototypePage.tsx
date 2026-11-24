@@ -24,7 +24,8 @@ import {
   seedProjectExploreTexts,
   type ExploreTextEntry,
 } from "@/components/reference-prototype/exploreGrid";
-import { IdeaveLogo, ProfileIconButton } from "@/components/reference-prototype/IdeaveLogo";
+import { IdeaveLogo } from "@/components/reference-prototype/IdeaveLogo";
+import { ProfileMenu } from "@/components/reference-prototype/ProfileMenu";
 import { BoardCanvasCard, type BoardCanvasItem } from "@/components/reference-prototype/BoardCanvasCard";
 import {
   BOARD_TEXT_FONT_SIZE,
@@ -1367,16 +1368,20 @@ function IndexTab({
     ? "w-10"
     : expandable
       ? "w-[var(--index-tab-w)] hover:w-[calc(var(--index-tab-w)+200px)] focus-visible:w-[calc(var(--index-tab-w)+200px)]"
-      : "w-[var(--index-tab-w)] hover:w-10";
+      : // 마우스를 올리면 12px 튀어나오며 끝에서 살짝 튕긴다(지금 4px과 큰 시안 20px의 중간).
+        "w-[var(--index-tab-w)] hover:w-12 focus-visible:w-12";
   return (
     <button
       type="button"
       onClick={onClick}
+      data-index-tab={tone}
       aria-pressed={active}
       title={detail ? undefined : label}
       aria-label={detail ? `${detail.topic} · ${detail.keywords.join(", ")}` : undefined}
       className={`group/tab flex h-[150px] items-stretch justify-end overflow-hidden rounded-l-[4px] ${
-        expandable ? `transition-[width] ${SIDE_PANEL_SLIDE_CLASS}` : "transition-[width] duration-150"
+        expandable
+          ? `transition-[width] ${SIDE_PANEL_SLIDE_CLASS}`
+          : "transition-[width] duration-[280ms] ease-[cubic-bezier(0.34,1.4,0.64,1)]"
       } ${toneClass} ${widthClass}`}
     >
       {detail ? (
@@ -5090,16 +5095,8 @@ export function ReferencePrototypePage() {
         <header className="bg-[#222222]">
           <div className="flex w-full items-center justify-between px-10 py-3">
             <IdeaveLogo theme="dark" onHomeClick={goToExploreHome} />
-            <div className="flex shrink-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setCreateModalOpen(true)}
-                className="text-[14px] font-medium text-[#F0F0F0] transition-opacity hover:opacity-80"
-              >
-                만들기
-              </button>
-              <ProfileIconButton />
-            </div>
+            {/* 만들기는 프로필 옆 픽셀 꺾쇠 메뉴 안으로 옮겼다. */}
+            <ProfileMenu onCreate={() => setCreateModalOpen(true)} />
           </div>
         </header>
 
@@ -5470,6 +5467,7 @@ export function ReferencePrototypePage() {
                   >
                   <div
                     aria-hidden
+                    data-board-dots
                     className="pointer-events-none absolute inset-0 z-0"
                     style={{
                       backgroundImage:

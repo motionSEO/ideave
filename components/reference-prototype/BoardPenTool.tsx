@@ -68,6 +68,7 @@ export function BoardStrokeLayer({
 export function PenIcon({ active, color }: { active: boolean; color: string }) {
   return (
     <span
+      data-pen-icon={active ? "on" : "off"}
       className={`relative flex h-8 w-8 items-center justify-center rounded-[4px] transition-colors ${
         active ? "bg-[#222222]" : "bg-transparent"
       }`}
