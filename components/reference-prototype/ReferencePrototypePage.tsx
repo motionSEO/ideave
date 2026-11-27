@@ -33,9 +33,17 @@ import {
 } from "@/components/reference-prototype/boardTextSize";
 import { applyBoardResize, type ResizeEdge } from "@/components/reference-prototype/boardResize";
 import { CloseButton } from "@/components/reference-prototype/CloseIcon";
-import { BoardStrokeLayer, PenIcon, PenSettingsPopover } from "@/components/reference-prototype/BoardPenTool";
 import {
+  BoardStrokeLayer,
+  EraserIcon,
+  EraserSettingsPopover,
+  PenIcon,
+  PenSettingsPopover,
+} from "@/components/reference-prototype/BoardPenTool";
+import {
+  DEFAULT_BOARD_ERASER_SIZE,
   DEFAULT_BOARD_PEN,
+  eraseStrokesAt,
   isBoardStroke,
   strokeHitsRect,
   strokePathD,
@@ -1582,6 +1590,16 @@ export function ReferencePrototypePage() {
   const boardStrokesRef = useRef<BoardStroke[]>([]);
   const boardLivePathRef = useRef<SVGPathElement | null>(null);
   const boardPenButtonRef = useRef<HTMLButtonElement | null>(null);
+  // ── 지우개(펜과 동시에 켜지지 않는다) ──
+  const [boardEraserMode, setBoardEraserMode] = useState(false);
+  const [boardEraserPopoverOpen, setBoardEraserPopoverOpen] = useState(false);
+  /** 지우개 지름(화면 px). 확대·축소와 상관없이 화면에서 같은 크기로 보인다. */
+  const [boardEraserSize, setBoardEraserSize] = useState(DEFAULT_BOARD_ERASER_SIZE);
+  const boardEraserModeRef = useRef(false);
+  const boardEraserButtonRef = useRef<HTMLButtonElement | null>(null);
+  const boardEraserCursorRef = useRef<HTMLDivElement | null>(null);
+  /** 지우기 직전 획 목록(Ctrl+Z로 되돌림) */
+  const boardEraseUndoRef = useRef<BoardStroke[][]>([]);
   // 끌어서 고른 펜 획(Delete로 지운다)
   const [boardSelectedStrokeIds, setBoardSelectedStrokeIds] = useState<Set<string>>(() => new Set());
   const boardSelectedStrokeIdsRef = useRef<Set<string>>(boardSelectedStrokeIds);
@@ -3458,10 +3476,11 @@ export function ReferencePrototypePage() {
 
   useEffect(() => {
     boardPenModeRef.current = boardPenMode;
-    if (boardPenMode) {
+    boardEraserModeRef.current = boardEraserMode;
+    if (boardPenMode || boardEraserMode) {
       setBoardSelectedStrokeIds(new Set());
     }
-  }, [boardPenMode]);
+  }, [boardPenMode, boardEraserMode]);
 
   useEffect(() => {
     boardSelectedStrokeIdsRef.current = boardSelectedStrokeIds;
@@ -4206,6 +4225,7 @@ export function ReferencePrototypePage() {
     setBoardItems([]);
     setBoardStrokes([]);
     setBoardSelectedStrokeIds(new Set());
+    boardEraseUndoRef.current = [];
     removeSessionItem(FORUS_BOARD_STROKES_KEY);
     boardStackOffsetRef.current = 0;
     setBoardSelectedIds(new Set());
@@ -4408,6 +4428,16 @@ export function ReferencePrototypePage() {
           return;
         }
 
+        // 지우개를 쓰는 중이면 실행 취소는 마지막으로 지운 것을 되살린다.
+        if (boardEraserModeRef.current) {
+          const before = boardEraseUndoRef.current.pop();
+          if (before) {
+            e.preventDefault();
+            setBoardStrokes(before);
+          }
+          return;
+        }
+
         // 펜을 쓰는 중이면 실행 취소는 마지막 획부터 지운다.
         if (boardPenModeRef.current && boardStrokesRef.current.length > 0) {
           e.preventDefault();
@@ -4430,9 +4460,11 @@ export function ReferencePrototypePage() {
         return;
       }
 
-      if (boardPenModeRef.current) {
+      if (boardPenModeRef.current || boardEraserModeRef.current) {
         setBoardPenMode(false);
         setBoardPenPopoverOpen(false);
+        setBoardEraserMode(false);
+        setBoardEraserPopoverOpen(false);
         return;
       }
 
@@ -4792,6 +4824,94 @@ export function ReferencePrototypePage() {
         points,
       };
       setBoardStrokes((prev) => [...prev, stroke]);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+
+  // 지우개: 마우스를 따라다니는 원(화면 px 지름)을 캔버스 상자 기준으로 옮긴다. null이면 숨긴다.
+  const moveBoardEraserCursor = (clientX: number | null, clientY = 0) => {
+    const cursor = boardEraserCursorRef.current;
+    // 원이 들어 있는 투명 막 기준으로 잰다(캔버스 테두리 두께만큼 어긋나지 않게).
+    const layer = cursor?.parentElement;
+    if (!cursor || !layer) {
+      return;
+    }
+    if (clientX === null) {
+      cursor.style.display = "none";
+      return;
+    }
+    const rect = layer.getBoundingClientRect();
+    cursor.style.display = "";
+    cursor.style.transform = `translate(${clientX - rect.left}px, ${clientY - rect.top}px) translate(-50%, -50%)`;
+  };
+
+  // 지우개 모드: 누른 채 끌면 원이 지나간 부분의 펜 선만 지운다(카드는 그대로).
+  const startBoardErase = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button === 1 || (event.button === 0 && boardSpacePressedRef.current)) {
+      startBoardPan(event);
+      return;
+    }
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    setBoardEraserPopoverOpen(false);
+    const el = boardCanvasRef.current;
+    if (!el) {
+      return;
+    }
+    const before = boardStrokesRef.current;
+    let working = before;
+    // 화면 지름 → 월드 반지름(확대해 있으면 월드 기준으로는 작아진다)
+    const radius = boardEraserSize / 2 / boardViewScaleRef.current;
+    const toWorld = (clientX: number, clientY: number): [number, number] => {
+      const pan = boardViewPanRef.current;
+      const point = clientToBoardPoint(clientX, clientY, el, pan.x, pan.y, boardViewScaleRef.current);
+      return [point.x, point.y];
+    };
+    const makeId = (base: string) => {
+      boardStrokeSeqRef.current += 1;
+      return `${base.split("~")[0]}~${Date.now().toString(36)}${boardStrokeSeqRef.current}`;
+    };
+    let last = toWorld(event.clientX, event.clientY);
+    let frame = 0;
+    const flush = () => {
+      frame = 0;
+      setBoardStrokes(working);
+    };
+    const eraseAlong = (next: [number, number]) => {
+      // 빠르게 끌어도 빈틈 없이: 지난 위치에서 지금 위치까지 반지름의 절반 간격으로 지운다.
+      const steps = Math.max(1, Math.ceil(Math.hypot(next[0] - last[0], next[1] - last[1]) / Math.max(1, radius / 2)));
+      for (let k = 1; k <= steps; k += 1) {
+        const t = k / steps;
+        working = eraseStrokesAt(working, last[0] + (next[0] - last[0]) * t, last[1] + (next[1] - last[1]) * t, radius, makeId);
+      }
+      last = next;
+      if (!frame) {
+        frame = window.requestAnimationFrame(flush);
+      }
+    };
+    working = eraseStrokesAt(working, last[0], last[1], radius, makeId);
+    if (working !== before) {
+      frame = window.requestAnimationFrame(flush);
+    }
+    const move = (ev: MouseEvent) => {
+      moveBoardEraserCursor(ev.clientX, ev.clientY);
+      eraseAlong(toWorld(ev.clientX, ev.clientY));
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      if (working !== before) {
+        boardEraseUndoRef.current = [...boardEraseUndoRef.current.slice(-29), before];
+        setBoardStrokes(working);
+      }
     };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
@@ -5564,6 +5684,32 @@ export function ReferencePrototypePage() {
                       className="absolute inset-0 z-30 cursor-crosshair"
                     />
                   ) : null}
+                  {boardEraserMode ? (
+                    // 지우개를 켠 동안 캔버스 전체를 덮는 투명 막. 마우스 대신 지우개 크기의 원이 따라다닌다.
+                    <div
+                      aria-hidden
+                      onMouseDown={startBoardErase}
+                      onMouseMove={(event) => moveBoardEraserCursor(event.clientX, event.clientY)}
+                      onMouseLeave={() => moveBoardEraserCursor(null)}
+                      className="absolute inset-0 z-30 cursor-none"
+                    >
+                      <div
+                        ref={boardEraserCursorRef}
+                        data-eraser-cursor
+                        className="pointer-events-none absolute left-0 top-0 rounded-full border-[1.5px] border-[#222222] bg-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+                        style={{ width: boardEraserSize, height: boardEraserSize, display: "none" }}
+                      />
+                    </div>
+                  ) : null}
+                  {boardEraserMode && boardEraserPopoverOpen ? (
+                    <EraserSettingsPopover
+                      size={boardEraserSize}
+                      onChange={setBoardEraserSize}
+                      onClose={() => setBoardEraserPopoverOpen(false)}
+                      anchorRef={boardEraserButtonRef}
+                      boundsRef={boardCanvasRef}
+                    />
+                  ) : null}
                   {boardPenMode && boardPenPopoverOpen ? (
                     <PenSettingsPopover
                       settings={boardPen}
@@ -5587,7 +5733,7 @@ export function ReferencePrototypePage() {
                       onMouseDown={(event) => event.stopPropagation()}
                       onClick={requestBoardKeywordExtract}
                       disabled={!canExtractBoardKeywords || boardKeywordLoading}
-                      className={`flex h-8 min-w-[240px] flex-1 items-center justify-center gap-2.5 rounded-[5px] border px-4 py-[10px] transition-colors ${
+                      className={`flex h-8 min-w-[196px] flex-1 items-center justify-center gap-2.5 rounded-[5px] border px-4 py-[10px] transition-colors ${
                         boardKeywordLoading
                           ? "border-[#E5E5E5] bg-[#F0F0F0] font-[family-name:var(--font-pretendard)] text-[14px] font-medium text-black"
                           : canExtractBoardKeywords
@@ -5607,6 +5753,8 @@ export function ReferencePrototypePage() {
                             if (!boardPenMode) {
                               setBoardPenMode(true);
                               setBoardPenPopoverOpen(true);
+                              setBoardEraserMode(false);
+                              setBoardEraserPopoverOpen(false);
                               setBoardSelectedIds(new Set());
                               return;
                             }
@@ -5623,6 +5771,34 @@ export function ReferencePrototypePage() {
                           className="flex h-8 w-8 items-center justify-center p-0 transition-opacity hover:opacity-80"
                         >
                           <PenIcon active={boardPenMode} color={boardPen.color} />
+                        </button>
+                        {/* 지우개: 펜과 같은 방식(끄기 → 켜기+설정 / 설정 닫힘 → 열기 / 열림 → 끄기) */}
+                        <button
+                          type="button"
+                          data-eraser-toggle
+                          ref={boardEraserButtonRef}
+                          onClick={() => {
+                            if (!boardEraserMode) {
+                              setBoardEraserMode(true);
+                              setBoardEraserPopoverOpen(true);
+                              setBoardPenMode(false);
+                              setBoardPenPopoverOpen(false);
+                              setBoardSelectedIds(new Set());
+                              return;
+                            }
+                            if (!boardEraserPopoverOpen) {
+                              setBoardEraserPopoverOpen(true);
+                              return;
+                            }
+                            setBoardEraserMode(false);
+                            setBoardEraserPopoverOpen(false);
+                          }}
+                          aria-pressed={boardEraserMode}
+                          aria-label="지우개"
+                          title="지우개 (Esc로 끄기)"
+                          className="flex h-8 w-8 items-center justify-center p-0 transition-opacity hover:opacity-80"
+                        >
+                          <EraserIcon active={boardEraserMode} />
                         </button>
                         <button
                           type="button"

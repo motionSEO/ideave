@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import {
+  BOARD_ERASER_MAX,
+  BOARD_ERASER_MIN,
   BOARD_PEN_PRESET_COLORS,
   BOARD_PEN_SIZES,
   BOARD_PEN_TYPES,
@@ -124,31 +126,24 @@ function PenTypeSample({ type, color }: { type: BoardPenType; color: string }) {
  * 펜 설정 창(L-1 화이트 기본): 미리보기 → 펜 종류 드롭다운 → 두께 → 사각형 색상 팔레트.
  * 테두리 없이 흰 면 + 그림자, 고른 항목은 라임.
  */
-export function PenSettingsPopover({
-  settings,
-  onChange,
-  onClose,
-  anchorRef,
-  boundsRef,
-}: {
-  settings: BoardPenSettings;
-  onChange: (next: BoardPenSettings) => void;
-  onClose: () => void;
-  /** 펜 아이콘 버튼: 창의 말꼬리가 가리킬 곳 */
-  anchorRef: RefObject<HTMLElement | null>;
-  /** 캔버스 상자: 창이 이 안에서 잘리지 않게 위치·너비·높이를 맞춘다 */
-  boundsRef: RefObject<HTMLElement | null>;
-}) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [layout, setLayout] = useState<{
-    left: number;
-    bottom: number;
-    width: number;
-    arrowLeft: number;
-    maxHeight: number;
-  } | null>(null);
+type AnchoredPopoverLayout = {
+  left: number;
+  bottom: number;
+  width: number;
+  arrowLeft: number;
+  maxHeight: number;
+};
 
-  // 캔버스 너비를 줄이거나 하단 바가 가로로 스크롤돼도 창이 캔버스 안에 들어오고 말꼬리는 펜 아이콘을 가리키게 한다.
+/**
+ * 하단 바 아이콘 위에 뜨는 설정 창의 위치.
+ * 캔버스 너비를 줄이거나 하단 바가 가로로 스크롤돼도 창이 캔버스 안에 들어오고 말꼬리는 아이콘을 가리키게 한다.
+ */
+function useAnchoredPopoverLayout(
+  anchorRef: RefObject<HTMLElement | null>,
+  boundsRef: RefObject<HTMLElement | null>,
+  preferredWidth: number,
+): AnchoredPopoverLayout | null {
+  const [layout, setLayout] = useState<AnchoredPopoverLayout | null>(null);
   useLayoutEffect(() => {
     const bounds = boundsRef.current;
     const anchor = anchorRef.current;
@@ -158,9 +153,9 @@ export function PenSettingsPopover({
     const measure = () => {
       const box = bounds.getBoundingClientRect();
       const a = anchor.getBoundingClientRect();
-      const width = Math.min(POPOVER_WIDTH, box.width - POPOVER_EDGE_GAP * 2);
+      const width = Math.min(preferredWidth, box.width - POPOVER_EDGE_GAP * 2);
       const anchorX = a.left + a.width / 2 - box.left;
-      // 기본은 말꼬리가 창 오른쪽에서 36px 들어간 자리(펜 아이콘 위). 캔버스 밖으로 나가면 안쪽으로 민다.
+      // 기본은 말꼬리가 창 오른쪽에서 36px 들어간 자리(아이콘 위). 캔버스 밖으로 나가면 안쪽으로 민다.
       const preferredLeft = anchorX - (width - 36);
       const left = Math.max(POPOVER_EDGE_GAP, Math.min(preferredLeft, box.width - width - POPOVER_EDGE_GAP));
       const arrowLeft = Math.max(14, Math.min(anchorX - left - 6, width - 26));
@@ -184,7 +179,172 @@ export function PenSettingsPopover({
       toolbar?.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
-  }, [anchorRef, boundsRef]);
+  }, [anchorRef, boundsRef, preferredWidth]);
+  return layout;
+}
+
+/** 하단 바 지우개 아이콘(E-1). 켜져 있으면 밝은 칸 위에 검정 선. */
+export function EraserIcon({ active }: { active: boolean }) {
+  // 켜진 칸은 밝은 회색이라, 다크 모드에서도 선을 검정으로 둔다(인라인 스타일이 다크 CSS보다 우선).
+  const strokeStyle = active ? { stroke: "#222222" } : undefined;
+  return (
+    <span
+      data-pen-icon={active ? "on" : "off"}
+      className="relative flex h-8 w-8 items-center justify-center rounded-[4px] bg-transparent transition-colors"
+      style={active ? { backgroundColor: "#F0F0F0" } : undefined}
+    >
+      <svg width={20} height={20} viewBox="0 0 20 20" fill="none" strokeLinejoin="round" strokeLinecap="round" aria-hidden>
+        <path d="M3 12 11 4l5 5-8 8z" stroke="#222222" style={strokeStyle} strokeWidth={1.8} />
+        <path d="M6.5 8.5l5 5" stroke="#222222" style={strokeStyle} strokeWidth={1.8} />
+        <path d="M8 17h9" stroke="#222222" style={strokeStyle} strokeWidth={1.8} />
+      </svg>
+    </span>
+  );
+}
+
+const ERASER_POPOVER_WIDTH = 236;
+
+/** 지우개 설정 창(S-2): 크기 숫자 + 실제 크기 원 미리보기 + 슬라이더. */
+export function EraserSettingsPopover({
+  size,
+  onChange,
+  onClose,
+  anchorRef,
+  boundsRef,
+}: {
+  size: number;
+  onChange: (next: number) => void;
+  onClose: () => void;
+  anchorRef: RefObject<HTMLElement | null>;
+  boundsRef: RefObject<HTMLElement | null>;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const layout = useAnchoredPopoverLayout(anchorRef, boundsRef, ERASER_POPOVER_WIDTH);
+
+  // 바깥을 누르면 닫는다(지우개 모드는 유지). 지우개 아이콘 버튼은 직접 열고 닫으므로 제외.
+  useEffect(() => {
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target || rootRef.current?.contains(target) || target.closest("[data-eraser-toggle]")) {
+        return;
+      }
+      onClose();
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [onClose]);
+
+  const clamp = (value: number) => Math.round(Math.min(BOARD_ERASER_MAX, Math.max(BOARD_ERASER_MIN, value)));
+  const ratio = (size - BOARD_ERASER_MIN) / (BOARD_ERASER_MAX - BOARD_ERASER_MIN);
+
+  const startDrag = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const track = event.currentTarget;
+    track.focus();
+    const update = (clientX: number) => {
+      const rect = track.getBoundingClientRect();
+      const t = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      onChange(clamp(BOARD_ERASER_MIN + t * (BOARD_ERASER_MAX - BOARD_ERASER_MIN)));
+    };
+    update(event.clientX);
+    const move = (ev: MouseEvent) => update(ev.clientX);
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+
+  const labelClass =
+    "font-[family-name:var(--font-pretendard)] text-[11px] font-semibold tracking-[0.06em] text-[#9A9A9A]";
+
+  return (
+    <div
+      ref={rootRef}
+      data-board-chrome
+      role="dialog"
+      aria-label="지우개 설정"
+      onMouseDown={(event) => event.stopPropagation()}
+      className="absolute z-50 flex select-none flex-col rounded-[10px] bg-white shadow-[0_12px_32px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.06)]"
+      style={
+        layout
+          ? { left: layout.left, bottom: layout.bottom, width: layout.width }
+          : { right: 96, bottom: 70, width: ERASER_POPOVER_WIDTH, visibility: "hidden" }
+      }
+    >
+      <span
+        aria-hidden
+        className="absolute -bottom-[6px] h-3 w-3 rotate-45 bg-white"
+        style={{ left: layout?.arrowLeft ?? ERASER_POPOVER_WIDTH - 36 }}
+      />
+      <div className="flex flex-col gap-2.5 p-4">
+        <div className="flex items-center justify-between">
+          <span className={labelClass}>지우개 크기</span>
+          <span className="rounded-[4px] bg-[#F3F3F3] px-2 py-[3px] font-mono text-[12px] text-[#222222]">{size}px</span>
+        </div>
+        {/* 고른 크기 그대로의 원(캔버스 위 지우개 원과 같은 크기) */}
+        <div className="flex h-[96px] items-center justify-center rounded-[6px] bg-[#F3F3F3]">
+          <i
+            aria-hidden
+            className="block rounded-full border-[1.5px] border-[#222222] bg-white"
+            style={{ width: size, height: size }}
+          />
+        </div>
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-label="지우개 크기"
+          aria-valuemin={BOARD_ERASER_MIN}
+          aria-valuemax={BOARD_ERASER_MAX}
+          aria-valuenow={size}
+          onMouseDown={startDrag}
+          onKeyDown={(event) => {
+            const step = event.shiftKey ? 8 : 2;
+            if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+              event.preventDefault();
+              onChange(clamp(size + step));
+            } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+              event.preventDefault();
+              onChange(clamp(size - step));
+            }
+          }}
+          className="relative mx-1 my-2 h-4 cursor-pointer outline-none"
+        >
+          <span aria-hidden className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-[2px] bg-[#E5E5E5]" />
+          <span
+            aria-hidden
+            className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-[2px] bg-[#222222]"
+            style={{ width: `${ratio * 100}%` }}
+          />
+          <span
+            aria-hidden
+            className="absolute top-1/2 -ml-[7px] -mt-[7px] h-[14px] w-[14px] rounded-[3px] border-2 border-[#222222] bg-white"
+            style={{ left: `${ratio * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function PenSettingsPopover({
+  settings,
+  onChange,
+  onClose,
+  anchorRef,
+  boundsRef,
+}: {
+  settings: BoardPenSettings;
+  onChange: (next: BoardPenSettings) => void;
+  onClose: () => void;
+  /** 펜 아이콘 버튼: 창의 말꼬리가 가리킬 곳 */
+  anchorRef: RefObject<HTMLElement | null>;
+  /** 캔버스 상자: 창이 이 안에서 잘리지 않게 위치·너비·높이를 맞춘다 */
+  boundsRef: RefObject<HTMLElement | null>;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const layout = useAnchoredPopoverLayout(anchorRef, boundsRef, POPOVER_WIDTH);
   const [typeOpen, setTypeOpen] = useState(false);
   const [hsv, setHsv] = useState(() => hexToHsv(settings.color) ?? { h: 0, s: 0, v: 0.13 });
   const [hexDraft, setHexDraft] = useState(settings.color);

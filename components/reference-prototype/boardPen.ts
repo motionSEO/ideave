@@ -188,6 +188,78 @@ export function strokeHitsRect(stroke: BoardStroke, x: number, y: number, w: num
   return false;
 }
 
+// ── 지우개 ──
+/** 지우개 크기(화면 px, 지름) 범위와 기본값 */
+export const BOARD_ERASER_MIN = 8;
+export const BOARD_ERASER_MAX = 80;
+export const DEFAULT_BOARD_ERASER_SIZE = 24;
+
+/** 긴 선분 사이에 점을 채워 넣어, 지우개 원이 선분 한가운데만 지나가도 그 부분이 지워지게 한다. */
+function densifyPoints(points: Array<[number, number]>, maxGap: number): Array<[number, number]> {
+  if (points.length < 2) {
+    return points;
+  }
+  const out: Array<[number, number]> = [points[0]!];
+  for (let i = 1; i < points.length; i += 1) {
+    const [ax, ay] = points[i - 1]!;
+    const [bx, by] = points[i]!;
+    const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / maxGap);
+    for (let k = 1; k < steps; k += 1) {
+      const t = k / steps;
+      out.push([Math.round((ax + (bx - ax) * t) * 10) / 10, Math.round((ay + (by - ay) * t) * 10) / 10]);
+    }
+    out.push(points[i]!);
+  }
+  return out;
+}
+
+/**
+ * 지우개 원(월드 좌표 중심·반지름)에 닿은 부분만 획에서 지운다.
+ * 획 가운데가 지워지면 남은 앞뒤 조각이 각각 새 획이 된다. 바뀐 게 없으면 같은 배열을 돌려준다.
+ */
+export function eraseStrokesAt(
+  strokes: BoardStroke[],
+  cx: number,
+  cy: number,
+  radius: number,
+  makeId: (base: string) => string,
+): BoardStroke[] {
+  let changed = false;
+  const next: BoardStroke[] = [];
+  for (const stroke of strokes) {
+    const reach = radius + stroke.size / 2;
+    const box = strokeBounds(stroke);
+    if (cx + reach < box.minX || cx - reach > box.maxX || cy + reach < box.minY || cy - reach > box.maxY) {
+      next.push(stroke);
+      continue;
+    }
+    const dense = densifyPoints(stroke.points, Math.max(1, radius / 3));
+    const hit = (p: [number, number]) => Math.hypot(p[0] - cx, p[1] - cy) <= reach;
+    if (!dense.some(hit)) {
+      next.push(stroke);
+      continue;
+    }
+    changed = true;
+    // 닿지 않은 점들을 이어진 덩어리로 나눈다. 점 하나만 남은 조각은 버린다(지운 자리에 점이 남지 않게).
+    let run: Array<[number, number]> = [];
+    const flush = () => {
+      if (run.length >= 2) {
+        next.push({ ...stroke, id: makeId(stroke.id), points: run });
+      }
+      run = [];
+    };
+    for (const p of dense) {
+      if (hit(p)) {
+        flush();
+      } else {
+        run.push(p);
+      }
+    }
+    flush();
+  }
+  return changed ? next : strokes;
+}
+
 export function isBoardStroke(value: unknown): value is BoardStroke {
   if (!value || typeof value !== "object") {
     return false;

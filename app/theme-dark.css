@@ -194,6 +194,29 @@ html[data-theme="dark"] [aria-label="펜 설정"] .outline-\[\#222222\] {
   outline-color: var(--d-text);
 }
 
+/* 지우개 설정 창·캔버스 위 지우개 원 */
+html[data-theme="dark"] [aria-label="지우개 설정"],
+html[data-theme="dark"] [aria-label="지우개 설정"] > span[aria-hidden] {
+  background-color: var(--d-surface2);
+}
+html[data-theme="dark"] [aria-label="지우개 설정"] .bg-\[\#F3F3F3\] {
+  background-color: var(--d-surface3);
+}
+html[data-theme="dark"] [aria-label="지우개 설정"] .border-\[\#222222\],
+html[data-theme="dark"] [data-eraser-cursor] {
+  border-color: var(--d-text);
+}
+html[data-theme="dark"] [aria-label="지우개 설정"] .bg-\[\#222222\] {
+  background-color: var(--d-text);
+}
+html[data-theme="dark"] [aria-label="지우개 설정"] .bg-\[\#E5E5E5\] {
+  background-color: #3a3a3a;
+}
+html[data-theme="dark"] [data-eraser-cursor] {
+  background-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
 /* 프로필 메뉴의 고르지 않은 모드 칸이 메뉴 바탕에 묻히지 않게 */
 html[data-theme="dark"] [role="menu"] .bg-\[\#F3F3F3\] {
   background-color: var(--d-surface3);
