@@ -21,9 +21,9 @@ type ProjectRegisterModalProps = {
 const MODAL_CLASS =
   "relative z-[1] flex h-[370px] w-[800px] max-w-[calc(100vw-2rem)] flex-col rounded-[5px] bg-white p-10 shadow-xl";
 
-// 오른쪽 인덱스 패널: 화면 맨 위부터 깔아 상단 고정 영역(z-50) 아래 틈까지 흰 면으로 채운다.
+// 오른쪽 인덱스 패널: 화면 맨 위부터 깔고, 검색 띠는 패널만큼 좁아지므로 헤더 바로 아래부터 내용이 보인다.
 const PANEL_CLASS =
-  "fixed bottom-0 right-0 top-0 z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col bg-white px-8 pb-8 pt-[12.5rem] shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-x-full";
+  "fixed bottom-0 right-0 top-0 z-[47] flex w-[400px] max-w-[calc(100vw-3rem)] flex-col bg-white px-8 pb-8 pt-[calc(3.5rem+2rem)] shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:translate-x-full";
 
 const FIELD_LABEL_CLASS =
   "font-[family-name:var(--font-pretendard)] text-[14px] font-medium leading-normal text-[#222222]";

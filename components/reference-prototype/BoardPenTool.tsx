@@ -65,30 +65,39 @@ export function BoardStrokeLayer({
   );
 }
 
+/** 색이 어두운지(밝기 0~1). 어두운 펜 색이면 아이콘 바탕을 밝게 바꿔 색이 보이게 한다. */
+function colorLuminance(hex: string): number {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!match) {
+    return 0;
+  }
+  const n = parseInt(match[1]!, 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+}
+
+/** 하단 바 펜 아이콘. 켜져 있으면 고른 펜 색으로 펜을 그린다(어두운 색은 밝은 칸, 밝은 색은 검정 칸 위에). */
 export function PenIcon({ active, color }: { active: boolean; color: string }) {
+  const penColor = SAFE_HEX.test(color) ? color : "#222222";
+  const darkPen = colorLuminance(penColor) < 0.35;
+  // 인라인 스타일로 지정해 다크 모드 CSS 덮어쓰기보다 우선한다.
+  const boxStyle = active ? { backgroundColor: darkPen ? "#F0F0F0" : "#222222" } : undefined;
+  const strokeStyle = active ? { stroke: penColor } : undefined;
   return (
     <span
       data-pen-icon={active ? "on" : "off"}
-      className={`relative flex h-8 w-8 items-center justify-center rounded-[4px] transition-colors ${
-        active ? "bg-[#222222]" : "bg-transparent"
-      }`}
+      className="relative flex h-8 w-8 items-center justify-center rounded-[4px] bg-transparent transition-colors"
+      style={boxStyle}
     >
       <svg width={20} height={20} viewBox="0 0 20 20" fill="none" aria-hidden>
         <path
           d="M13.5 3.5l3 3L7 16l-4 1 1-4 9.5-9.5z"
-          stroke={active ? "#F5F53D" : "#222222"}
-          strokeWidth={1.6}
+          stroke="#222222"
+          style={strokeStyle}
+          strokeWidth={1.8}
           strokeLinejoin="round"
         />
-        <path d="M11.5 5.5l3 3" stroke={active ? "#F5F53D" : "#222222"} strokeWidth={1.6} />
+        <path d="M11.5 5.5l3 3" stroke="#222222" style={strokeStyle} strokeWidth={1.8} />
       </svg>
-      {active ? (
-        <span
-          aria-hidden
-          className="absolute bottom-[3px] right-[3px] h-[7px] w-[7px] border-[1.5px] border-white"
-          style={{ backgroundColor: color }}
-        />
-      ) : null}
     </span>
   );
 }

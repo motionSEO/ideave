@@ -123,13 +123,6 @@ html[data-theme="dark"] [data-index-tab="dark"] {
   background-color: var(--d-text);
   color: var(--d-bg);
 }
-/* 하단 바 펜 아이콘(켜짐): 검정 칸 → 라임 칸 + 검정 펜 */
-html[data-theme="dark"] [data-pen-icon="on"] {
-  background-color: #f5f53d;
-}
-html[data-theme="dark"] [data-pen-icon="on"] path {
-  stroke: #222222;
-}
 html[data-theme="dark"] [data-pen-icon="off"] path {
   stroke: var(--d-text);
 }
@@ -180,8 +173,7 @@ html[data-theme="dark"] svg[fill="#222222"],
 html[data-theme="dark"] svg [fill="#222222"] {
   fill: var(--d-text);
 }
-html[data-theme="dark"] .bg-\[\#F5F53D\] svg [stroke="#222222"],
-html[data-theme="dark"] [data-pen-icon="on"] svg [stroke] {
+html[data-theme="dark"] .bg-\[\#F5F53D\] svg [stroke="#222222"] {
   stroke: #222222;
 }
 html[data-theme="dark"] .bg-\[\#F5F53D\] svg [fill="#222222"] {

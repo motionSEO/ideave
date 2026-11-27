@@ -18,7 +18,12 @@ function PixelChevron({ open }: { open: boolean }) {
           x={x}
           width={2}
           height={2}
-          style={{ y: ys[index], transition: "y 220ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+          // 픽셀이 한꺼번에 바뀌면 순간 전환처럼 보여서, 한 칸씩 60ms 차이로 미끄러지게 한다
+          // (열 때는 왼쪽부터, 닫을 때는 오른쪽부터).
+          style={{
+            y: ys[index],
+            transition: `y 320ms cubic-bezier(0.34, 1.4, 0.64, 1) ${(open ? index : CHEVRON_X.length - 1 - index) * 60}ms`,
+          }}
         />
       ))}
     </svg>

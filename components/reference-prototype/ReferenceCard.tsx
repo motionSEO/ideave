@@ -22,14 +22,14 @@ type ReferenceCardProps = {
   onBackKeywordClick?: (keyword: string) => void;
 };
 
-// 텍스트 카드 관련 이미지 스택(T-2a): 사진 한 변, 사진끼리 밀리는 거리. 호버 때 바깥 사진은 17px 더 벌어진다(아래 클래스).
-const WOVEN_STACK_PHOTO_PX = 68;
-const WOVEN_STACK_OFFSET_PX = 38;
+// 텍스트 카드 관련 이미지 스택(T-a): 사진 한 변 80px, 사진끼리 밀리는 거리 44px. 호버 때 바깥 사진은 20px 더 벌어진다(아래 클래스).
+const WOVEN_STACK_PHOTO_PX = 80;
+const WOVEN_STACK_OFFSET_PX = 44;
 // 바깥 사진의 기울기(평소 / 호버). 가운데 사진은 똑바로 둔다.
 const WOVEN_STACK_TILT = [
-  { rest: "-rotate-[4deg]", hover: "group-hover/textcard:-translate-x-[17px] group-hover/textcard:-rotate-[6deg]" },
+  { rest: "-rotate-[4deg]", hover: "group-hover/textcard:-translate-x-[20px] group-hover/textcard:-rotate-[6deg]" },
   { rest: "", hover: "" },
-  { rest: "rotate-[4deg]", hover: "group-hover/textcard:translate-x-[17px] group-hover/textcard:rotate-[6deg]" },
+  { rest: "rotate-[4deg]", hover: "group-hover/textcard:translate-x-[20px] group-hover/textcard:rotate-[6deg]" },
 ];
 
 /** 텍스트 카드 관련 이미지: 사진 세 장이 살짝 기울어 겹쳐 있고, 카드에 마우스를 올리면 양옆으로 벌어진다. 클릭은 카드(텍스트 상세)로 넘긴다. */
@@ -139,37 +139,41 @@ function resolveUpperKeywords(tagLabels: string[], itemId: string): string[] {
   return pool.slice(0, 3);
 }
 
-// 뒤집기 아이콘(P-3): 엇갈린 두 픽셀 화살표 ⇄. "X"가 한 칸(픽셀)이다.
+// 뒤집기 아이콘(C-2): 엇갈린 두 픽셀 화살표 ⇄ (7×7칸). "X"가 한 칸이다.
 const FLIP_ICON_PIXEL_ROWS = [
-  "..X.....",
-  ".XX.....",
-  "XXXXXXXX",
-  ".XX.....",
-  "..X..X..",
-  ".....XX.",
-  "XXXXXXXX",
-  ".....XX.",
-  ".....X..",
+  ".X.....",
+  "XXXXXX.",
+  ".X.....",
+  ".......",
+  ".....X.",
+  ".XXXXXX",
+  ".....X.",
 ];
-const FLIP_ICON_PIXELS = FLIP_ICON_PIXEL_ROWS.flatMap((row, y) =>
-  [...row].flatMap((cell, x) => (cell === "X" ? [{ x, y }] : [])),
-);
+// 한 칸을 정확히 3px로 그린다. 2.57px처럼 딱 떨어지지 않으면 가장자리가 번져 멀리서 털처럼 보인다.
+const FLIP_ICON_CELL_PX = 3;
+// 아이콘(21px)을 22px 상자에 그려, 36px 버튼 가운데에 놓아도 위치가 정수 픽셀(7px)에 떨어지게 한다.
+const FLIP_ICON_BOX_PX = 22;
+const FLIP_ICON_PATH = FLIP_ICON_PIXEL_ROWS.flatMap((row, y) =>
+  [...row].flatMap((cell, x) =>
+    cell === "X"
+      ? [`M${x * FLIP_ICON_CELL_PX} ${y * FLIP_ICON_CELL_PX}h${FLIP_ICON_CELL_PX}v${FLIP_ICON_CELL_PX}h-${FLIP_ICON_CELL_PX}z`]
+      : [],
+  ),
+).join("");
 
 function FlipIcon() {
   return (
     <svg
-      width={16}
-      height={18}
-      viewBox="0 0 8 9"
+      width={FLIP_ICON_BOX_PX}
+      height={FLIP_ICON_BOX_PX}
+      viewBox={`0 0 ${FLIP_ICON_BOX_PX} ${FLIP_ICON_BOX_PX}`}
       fill="#F5F53D"
       shapeRendering="crispEdges"
-      // 버튼에 마우스를 올리면 좌우로 뒤집힌다.
-      className="block h-[18px] w-4 shrink-0 transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/flip:-scale-x-100"
+      // 버튼에 마우스를 올리면 통째로 좌우로 뒤집힌다(두 화살표 사이 간격은 그대로).
+      className="block h-[22px] w-[22px] shrink-0 transition-transform duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/flip:-scale-x-100"
       aria-hidden
     >
-      {FLIP_ICON_PIXELS.map(({ x, y }) => (
-        <rect key={`${x}-${y}`} x={x} y={y} width={1.02} height={1.02} />
-      ))}
+      <path d={FLIP_ICON_PATH} />
     </svg>
   );
 }
@@ -390,13 +394,13 @@ export function ReferenceCard({
           onDragStart={() => onDragStart?.(item)}
         >
           <div
-            className={`group/textcard box-border flex ${IDEAVE_EXPLORE_CARD_SIZE_CLASS} flex-col items-center justify-center gap-[22px] px-4 py-5 transition-[background-color,box-shadow] hover:bg-[#F5F53D] ${IDEAVE_EXPLORE_TEXT_CARD_SURFACE_CLASS} ${
+            className={`group/textcard box-border flex ${IDEAVE_EXPLORE_CARD_SIZE_CLASS} flex-col items-center justify-center gap-[18px] px-4 py-5 transition-[background-color,box-shadow] hover:bg-[#F5F53D] ${IDEAVE_EXPLORE_TEXT_CARD_SURFACE_CLASS} ${
               selected ? "ring-2 ring-[#1A1A1A]" : ""
             }`}
           >
             <p
               // 두 줄이 될 때 글자 중간이 아니라 띄어쓰기에서 줄을 바꾸고(keep-all), 두 줄 길이를 고르게(balance) 맞춘다.
-              className={`text-center text-[36px] font-medium leading-tight text-[#222222] [overflow-wrap:anywhere] [text-wrap:balance] [word-break:keep-all] ${
+              className={`text-center text-[34px] font-medium leading-tight text-[#222222] [overflow-wrap:anywhere] [text-wrap:balance] [word-break:keep-all] ${
                 woven ? "line-clamp-2" : "line-clamp-3"
               }`}
             >

@@ -123,8 +123,10 @@ const BOARD_KEYWORD_BUBBLE_HEIGHT = 44;
 const BOARD_KEYWORD_ARROW = 7;
 
 // 캔버스 패널 너비(사용자가 왼쪽 경계를 끌어 조절). 패널 560 → 캔버스 영역 480처럼 안쪽 여백 80px을 뺀다.
-const BOARD_PANEL_DEFAULT_PX = 560;
-const BOARD_PANEL_MIN_PX = 400;
+// 캔버스 패널 너비: 하단 바(키워드 버튼 240 + 아이콘 4개 164 + 여백·테두리)가 가로 스크롤 없이 딱 들어가는 540px을
+// 기본값이자 최소값으로 쓴다(바 432 + 좌우 12씩 + 캔버스 테두리 4 + 패널 안쪽 여백 80).
+const BOARD_PANEL_DEFAULT_PX = 540;
+const BOARD_PANEL_MIN_PX = 540;
 const BOARD_PANEL_INNER_GUTTER_PX = 80;
 const BOARD_PANEL_WIDTH_STORAGE_KEY = "ideave.boardPanelWidth";
 // 화면 오른쪽 인덱스 탭(프로젝트·캔버스) 너비. 캔버스가 닫혀 있을 땐 탐색 그리드 오른쪽 여백에 이만큼 더 비우고,
@@ -5091,8 +5093,9 @@ export function ReferencePrototypePage() {
         </nav>
       ) : null}
 
-      <div ref={stickyChromeRef} className="sticky top-0 z-50 w-full">
-        <header className="bg-[#222222]">
+      {/* 오른쪽 패널이 열리면 검색 띠가 좁아져 그 자리를 패널이 채운다. 빈 자리는 클릭이 패널로 가도록 통과시킨다. */}
+      <div ref={stickyChromeRef} className="pointer-events-none sticky top-0 z-50 w-full">
+        <header className="pointer-events-auto bg-[#222222]">
           <div className="flex w-full items-center justify-between px-10 py-3">
             <IdeaveLogo theme="dark" onHomeClick={goToExploreHome} />
             {/* 만들기는 프로필 옆 픽셀 꺾쇠 메뉴 안으로 옮겼다. */}
@@ -5100,7 +5103,15 @@ export function ReferencePrototypePage() {
           </div>
         </header>
 
-        <div className="relative w-full bg-[#FFFFFF]">
+        <div
+          className={`pointer-events-auto relative w-full bg-[#FFFFFF] ${
+            projectPanelMounted
+              ? "max-w-[calc(100%-min(400px,100vw-3rem))]"
+              : boardOpen
+                ? "lg:max-w-[calc(100%-var(--board-w))]"
+                : ""
+          }`}
+        >
           <div className="box-border px-10 pt-4 pb-3">
             <div className="flex w-full items-center gap-[85px]">
               <div ref={searchInputPlaceholderRef} className="min-w-0 flex-1">
@@ -5109,7 +5120,7 @@ export function ReferencePrototypePage() {
                   className={searchSuggestionsOpen ? "pointer-events-none invisible" : "relative min-w-0 flex-1"}
                   aria-hidden={searchSuggestionsOpen}
                 >
-                  <label className="flex h-8 w-full items-center rounded-[5px] border-0 bg-[#F0F0F0] py-0 pl-3 pr-1">
+                  <label className="flex h-12 w-full items-center rounded-[5px] border-0 bg-[#F0F0F0] py-0 pl-4 pr-1">
                     <span className="sr-only">검색</span>
                     <input
                       type="search"
@@ -5130,7 +5141,7 @@ export function ReferencePrototypePage() {
                     <button
                       type="button"
                       aria-label="검색 실행"
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-[#848484] transition-colors hover:bg-[#E5E5E5] hover:text-[#222222]"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] text-[#848484] transition-colors hover:bg-[#E5E5E5] hover:text-[#222222]"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => commitSearch()}
                     >
@@ -5147,9 +5158,8 @@ export function ReferencePrototypePage() {
 
           <div
             ref={filterChromeRef}
-            className={`absolute left-0 top-full z-10 w-full bg-[#FFFFFF] ${
-              boardOpen ? "lg:max-w-[calc(100%-var(--board-w))]" : ""
-            }`}
+            // 검색 띠 안에 있어 폭은 띠를 그대로 따른다(패널이 열리면 함께 좁아짐).
+            className="absolute left-0 top-full z-10 w-full bg-[#FFFFFF]"
           >
             {/* 상세 화면에서는 같은 필터가 추천 레퍼런스 바로 위에 표시된다. */}
             {!isDetailExplore ? (
@@ -5198,7 +5208,7 @@ export function ReferencePrototypePage() {
                   height: searchInputLayout.height,
                 }}
               >
-                <label className="flex h-full w-full items-center rounded-[5px] border-0 bg-[#F0F0F0] py-0 pl-3 pr-1">
+                <label className="flex h-full w-full items-center rounded-[5px] border-0 bg-[#F0F0F0] py-0 pl-4 pr-1">
                   <span className="sr-only">검색</span>
                   <input
                     type="search"
@@ -5217,7 +5227,7 @@ export function ReferencePrototypePage() {
                   <button
                     type="button"
                     aria-label="검색 실행"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-[#848484] transition-colors hover:bg-[#E5E5E5] hover:text-[#222222]"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] text-[#848484] transition-colors hover:bg-[#E5E5E5] hover:text-[#222222]"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => commitSearch()}
                   >
@@ -5398,10 +5408,10 @@ export function ReferencePrototypePage() {
 
         {/* select-none: 캔버스 여백에서 끌기 시작하면 브라우저가 카드 이미지를 파랗게 '텍스트 선택'하는 것을 막는다(텍스트 편집은 textarea라 영향 없음). */}
         {boardOpen && (
-          <aside ref={boardAsideRef} className={`sticky top-[8.25rem] z-45 hidden min-w-0 select-none self-start bg-white shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-8.25rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
+          <aside ref={boardAsideRef} className={`sticky top-14 z-45 lg:-mt-[4.75rem] hidden min-w-0 select-none self-start bg-white shadow-[-12px_0_32px_rgba(0,0,0,0.08)] transition-transform starting:translate-x-full lg:flex lg:h-[calc(100vh-3.5rem)] lg:w-[var(--board-w)] lg:flex-col ${SIDE_PANEL_SLIDE_CLASS} ${boardShown ? "translate-x-0" : "translate-x-full"}`}>
             {indexTabsHost === "board" ? (
-              // 화면 기준 top 12.5rem = 캔버스 패널(top 8.25rem) 안에서 4.25rem 아래.
-              <nav aria-label="프로젝트와 캔버스" className={`${indexTabsEdgeClass} top-[4.25rem] z-20`}>
+              // 화면 기준 top 12.5rem = 캔버스 패널(헤더 아래 top 3.5rem) 안에서 9rem 아래.
+              <nav aria-label="프로젝트와 캔버스" className={`${indexTabsEdgeClass} top-[9rem] z-20`}>
                 {indexTabs}
               </nav>
             ) : null}
